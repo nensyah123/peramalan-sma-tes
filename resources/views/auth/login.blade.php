@@ -22,7 +22,7 @@
     <link href="{{ asset('template/css/sb-admin-2.min.css') }}" rel="stylesheet">
     <style>
         :root {
-            --primary-red: #BE4132;
+            --primary-red: #74271f;
         }
         .bg-login-image {
             background: url("{{ asset('/template/img/logorental.png') }}");
@@ -79,7 +79,7 @@
                                             <input type="password" class="form-control form-control-user"
                                                 id="password" name="password" placeholder="Password" required>
                                         </div>
-                                        
+
                                         <button type="submit" class="btn btn-primary btn-user btn-block">
                                             Login
                                         </button>
