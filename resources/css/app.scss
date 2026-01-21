@@ -1,0 +1,50 @@
+/* Custom Overrides for SB Admin 2 */
+
+:root {
+    --primary-red: #be4132;
+    --sidebar-dark: #343a40;
+}
+
+/* Override Sidebar Active State */
+.sidebar .nav-item.active .nav-link {
+    color: #fff !important;
+    /* font-weight: bold; */
+}
+.sidebar .nav-item.active .nav-link i {
+    color: #fff !important;
+}
+
+/* Sidebar Sub-menu Active State (Collapse Items) */
+.collapse-item.active {
+    color: var(--primary-red) !important;
+    font-weight: 700 !important;
+    background-color: #eaecf4; /* Optional: light gray background like standard SB Admin active state */
+}
+
+/* Hover effects */
+.collapse-item:hover {
+    background-color: #eaecf4 !important;
+    color: var(--primary-red) !important;
+}
+
+/* Topbar background override just in case inline style isn't enough or for consistency */
+.bg-gradient-primary {
+    background-color: var(--primary-red) !important;
+    background-image: none !important;
+}
+
+/* Primary Button Override */
+.btn-primary {
+    background-color: var(--primary-red);
+    border-color: var(--primary-red);
+}
+.btn-primary:hover {
+    background-color: #a03023;
+    border-color: #a03023;
+}
+.text-primary {
+    color: var(--primary-red) !important;
+}
+.border-left-primary {
+    border-left: 0.25rem solid var(--primary-red) !important;
+}
