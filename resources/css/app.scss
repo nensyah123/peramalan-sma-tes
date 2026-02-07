@@ -1,50 +1,232 @@
-/* Custom Overrides for SB Admin 2 */
+/* ===================================================== */
+/* SIDEBAR                                               */
+/* ===================================================== */
 
-:root {
-    --primary-red: #be4132;
-    --sidebar-dark: #343a40;
-}
-
-/* Override Sidebar Active State */
-.sidebar .nav-item.active .nav-link {
-    color: #fff !important;
-    /* font-weight: bold; */
-}
-.sidebar .nav-item.active .nav-link i {
-    color: #fff !important;
+.sidebar{
+    background-color:#353B3B !important;
+    z-index:20;
 }
 
-/* Sidebar Sub-menu Active State (Collapse Items) */
-.collapse-item.active {
-    color: var(--primary-red) !important;
-    font-weight: 700 !important;
-    background-color: #eaecf4; /* Optional: light gray background like standard SB Admin active state */
+/* HEADER SIDEBAR (LOGO) */
+.sidebar-header{
+    background:#ffffff;
+    height:75px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border-bottom:1px solid #e5e5e5; /* sudah disamakan dengan topbar */
 }
 
-/* Hover effects */
-.collapse-item:hover {
-    background-color: #eaecf4 !important;
-    color: var(--primary-red) !important;
+.sidebar-logo{
+    height:55px;
+    width:auto;
+    object-fit:contain;
 }
 
-/* Topbar background override just in case inline style isn't enough or for consistency */
-.bg-gradient-primary {
-    background-color: var(--primary-red) !important;
-    background-image: none !important;
+
+/* ===================================================== */
+/* MENU SIDEBAR                                          */
+/* ===================================================== */
+
+.sidebar .nav-item .nav-link{
+    color:rgba(255,255,255,0.85) !important;
+    font-size:15px;
+    padding:14px 18px;
+    border-radius:8px;
+    margin:4px 10px;
+    transition:0.25s;
 }
 
-/* Primary Button Override */
-.btn-primary {
-    background-color: var(--primary-red);
-    border-color: var(--primary-red);
+.sidebar .nav-item .nav-link i{
+    color:rgba(255,255,255,0.75) !important;
 }
-.btn-primary:hover {
-    background-color: #a03023;
-    border-color: #a03023;
+
+
+/* HOVER */
+.sidebar .nav-item .nav-link:hover{
+    background-color:#40484f;
+    color:#ffffff !important;
 }
-.text-primary {
-    color: var(--primary-red) !important;
+
+.sidebar .nav-item .nav-link:hover i{
+    color:#ffffff !important;
 }
-.border-left-primary {
-    border-left: 0.25rem solid var(--primary-red) !important;
+
+
+/* ACTIVE MENU (indikator kiri elegan) */
+.sidebar .nav-item.active .nav-link{
+    background-color:transparent !important;
+    border-left:4px solid #ffffff;
+    color:#ffffff !important;
+    border-radius:0;
+    margin-left:0;
+    padding-left:14px;
+}
+
+.sidebar .nav-item.active .nav-link i{
+    color:#ffffff !important;
+}
+
+
+/* HEADING */
+.sidebar .sidebar-heading{
+    color:rgba(255,255,255,0.55) !important;
+    font-size:12px;
+    font-weight:700;
+    letter-spacing:1px;
+    padding-left:20px;
+}
+
+
+/* ===========*/
+/* SUB MENU
+/* ===========*/
+
+.collapse{
+    transition:all 0.25s ease;
+}
+
+.collapse-inner{
+    border-radius:10px !important;
+    overflow:hidden;
+    background:#ffffff !important; /* wajib biar kontras */
+}
+
+.collapse-item{
+    font-size:14px;
+    padding:11px 18px !important;
+    color:#333 !important;     /* 🔥 penyelamat tulisan */
+    display:block;
+}
+
+.collapse-item:hover{
+    background-color:#e4e4e4 !important;
+    color:#000 !important;
+    font-weight:600;
+}
+
+.collapse-item.active{
+    background-color:#dcdcdc !important;
+    color:#000 !important;
+    font-weight:700 !important;
+}
+
+
+/* ===================================================== */
+/* TOPBAR / HEADER                                       */
+/* ===================================================== */
+
+.custom-topbar{
+    background:#ffffff;
+    border-bottom:1px solid #e5e5e5;
+    height:75px;
+    padding:0 25px;
+    display:flex;
+    align-items:center;
+}
+
+/* Judul */
+.topbar-title{
+    display:flex;
+    flex-direction:column;
+}
+
+.system-title{
+    font-size:18px;
+    font-weight:800;
+    color:#2f2f2f;
+    letter-spacing:0.8px;
+    text-transform:uppercase;
+}
+
+.system-subtitle{
+    font-size:13px;
+    font-weight:600;
+    color:#777;
+}
+
+
+/* Garis pembatas kanan */
+.topbar-divider{
+    height:45px;
+    width:2px;
+    background:#d9d9d9;
+    margin-right:18px;
+}
+
+
+/* Area user */
+.user-area{
+    padding:0 !important;
+    display:flex;
+    align-items:center;
+}
+
+.username{
+    margin-right:10px;
+    font-weight:700;
+    color:#BE4132;
+    font-size:14px;
+}
+
+.user-avatar{
+    height:42px;
+    width:42px;
+    border-radius:50%;
+    border:2px solid #BE4132;
+    box-shadow:0 3px 10px rgba(0,0,0,0.15);
+}
+
+.user-dropdown{
+    border-radius:12px;
+    padding:10px 0;
+}
+
+.logout-btn{
+    font-weight:600;
+}
+
+
+/* ===================================================== */
+/* BUTTON MERAH (GLOBAL)                                 */
+/* ===================================================== */
+
+.btn-primary{
+    background-color:#BE4132 !important;
+    border-color:#BE4132 !important;
+}
+
+.btn-primary:hover{
+    background-color:#9e2f23 !important;
+    border-color:#9e2f23 !important;
+}
+
+.btn-primary:focus,
+.btn-primary:active{
+    background-color:#7f251c !important;
+    border-color:#7f251c !important;
+    box-shadow:none !important;
+}
+
+
+/* ===================================================== */
+/* CARD                                                  */
+/* ===================================================== */
+
+.card{
+    border-radius:10px;
+}
+
+.card-header{
+    background:#fff;
+    border-bottom:2px solid #f1f1f1;
+}
+
+/* Judul card jadi merah */
+.card-header,
+.card-header h5,
+.card-header h6,
+.text-primary{
+    color:#BE4132 !important;
+    font-weight:700;
 }
