@@ -4,8 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\Kendaraan;
 use App\Models\PeramalanSma;
-use App\Models\PemakaianKendaraan;
 use Illuminate\Http\Request;
+use Barryvdh\DomPDF\Facade\Pdf;
+use App\Models\PemakaianKendaraan;
 
 class PeramalanSmaController extends Controller
 {
@@ -225,6 +226,160 @@ class PeramalanSmaController extends Controller
     {
         PeramalanSma::findOrFail($id)->delete();
         return redirect()->route('peramalan_sma.index')->with('success', 'Riwayat peramalan berhasil dihapus.');
+    }
+
+    public function exportPdf($id)
+    {
+        $peramalan = PeramalanSma::with('kendaraan')->findOrFail($id);
+
+        // 1. Ambil Metrics dari kolom database (bukan dari JSON)
+        $metrics = [
+            'mae' => $peramalan->mae,
+            'mse' => $peramalan->mse,
+            'mape' => $peramalan->mape
+        ];
+
+        // 2. Ambil Data Tabel & Chart
+        $data = $peramalan->data_peramalan;
+        if (is_string($data)) {
+            $data = json_decode($data, true);
+        }
+
+        // Cek struktur data (apakah format baru 'table'/'chart' atau format lama hanya array tabel)
+        $table = [];
+        $chartData = [];
+
+        if (isset($data['table'])) {
+            // Format Baru (Full Structure)
+            $table = $data['table'];
+            $chartData = $data['chart'];
+        } else {
+            // Format Lama (Langsung Array Tabel)
+            $table = $data;
+
+            // Rekonstruksi Data Chart dari Tabel
+            $labels = [];
+            $actuals = [];
+            $predicteds = [];
+
+            foreach ($table as $row) {
+                $labels[] = $row['bulan_tahun'];
+                $actuals[] = ($row['aktual'] !== '-' && $row['aktual'] !== null) ? $row['aktual'] : null;
+                $predicteds[] = ($row['prediksi'] !== '-' && $row['prediksi'] !== null) ? $row['prediksi'] : null;
+            }
+
+            $chartData = [
+                'labels' => $labels,
+                'actual' => $actuals,
+                'predicted' => $predicteds
+            ];
+        }
+
+        // 3. Prepare Chart Data for SVG
+        $labels = $chartData['labels'];
+        $actuals = $chartData['actual'];
+        $predicteds = $chartData['predicted'];
+
+        // Calculate Min/Max for Y-axis scaling
+        $allValues = array_merge(
+            array_filter($actuals, fn($v) => $v !== null),
+            array_filter($predicteds, fn($v) => $v !== null)
+        );
+        $minY = empty($allValues) ? 0 : min($allValues);
+        $maxY = empty($allValues) ? 100 : max($allValues);
+        // Add padding
+        $padding = ($maxY - $minY) * 0.1;
+        if ($padding == 0) $padding = 10;
+        $minY = max(0, $minY - $padding);
+        $maxY = $maxY + $padding;
+
+        // SVG Dimensions
+        $svgWidth = 1000;
+        $svgHeight = 300;
+        $paddingLeft = 50;
+        $paddingBottom = 30;
+        $graphWidth = $svgWidth - $paddingLeft;
+        $graphHeight = $svgHeight - $paddingBottom;
+
+        $count = count($labels);
+        $stepX = $graphWidth / max(1, $count - 1);
+
+        // Function to get Y coordinate
+        $getY = function ($val) use ($graphHeight, $minY, $maxY) {
+            if ($val === null) return null;
+            $range = max(1, $maxY - $minY);
+            $ratio = ($val - $minY) / $range;
+            return $graphHeight - ($ratio * $graphHeight);
+        };
+
+        $actualPoints = [];
+        $predictedPoints = [];
+
+        foreach ($labels as $i => $label) {
+            $x = $paddingLeft + ($i * $stepX);
+
+            $yAct = $getY($actuals[$i] ?? null);
+            if ($yAct !== null) $actualPoints[] = "$x,$yAct";
+
+            $yPred = $getY($predicteds[$i] ?? null);
+            if ($yPred !== null) $predictedPoints[] = "$x,$yPred";
+        }
+
+        // Generate SVG String
+        $svgContent = '<svg width="' . $svgWidth . '" height="' . $svgHeight . '" viewBox="0 0 ' . $svgWidth . ' ' . $svgHeight . '" xmlns="http://www.w3.org/2000/svg">';
+        // Background & Border
+        $svgContent .= '<rect x="0" y="0" width="' . $svgWidth . '" height="' . $svgHeight . '" fill="none" stroke="#f0f0f0" stroke-width="1" />';
+
+        // Grid Lines
+        for ($i = 0; $i <= 4; $i++) {
+            $y = ($svgHeight - $paddingBottom) - ($i * ($svgHeight - $paddingBottom - 20) / 4);
+            $val = $minY + ($i * ($maxY - $minY) / 4);
+            $svgContent .= '<line x1="' . $paddingLeft . '" y1="' . $y . '" x2="' . $svgWidth . '" y2="' . $y . '" stroke="#e6e6e6" stroke-width="1" stroke-dasharray="4" />';
+            $svgContent .= '<text x="' . ($paddingLeft - 5) . '" y="' . ($y + 3) . '" font-family="sans-serif" font-size="10" fill="#888" text-anchor="end">' . number_format($val, 0) . '</text>';
+        }
+
+        // Lines
+        $actPts = implode(' ', $actualPoints);
+        $predPts = implode(' ', $predictedPoints);
+        $svgContent .= '<polyline points="' . $actPts . '" fill="none" stroke="#4e73df" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />';
+        $svgContent .= '<polyline points="' . $predPts . '" fill="none" stroke="#1cc88a" stroke-width="2" stroke-dasharray="5,5" stroke-linecap="round" stroke-linejoin="round"/>';
+
+        // X Labels
+        // Determine skip factor to avoid overlapping
+        $skip = 1;
+        if ($count > 12) {
+            $skip = ceil($count / 12);
+        }
+
+        foreach ($labels as $i => $label) {
+            $x = $paddingLeft + ($i * $stepX);
+            $y = $svgHeight - 10;
+
+            // Logic to show label: always first, always last, and respecting skip factor
+            if ($i == 0 || $i == $count - 1 || $i % $skip == 0) {
+                // Optional: Shorten label if needed (e.g. "January 2023" -> "Jan 23")
+                // Assuming format might be "Month YYYY" or "M YYYY"
+                // Let's try to keep it as is but rely on skipping. 
+                // If you want to shorten:
+                // $shortLabel = substr($label, 0, 3) . ' ' .  substr($label, -2);
+                $svgContent .= '<text x="' . $x . '" y="' . $y . '" font-family="sans-serif" font-size="9" fill="#666" text-anchor="middle">' . $label . '</text>';
+            }
+        }
+
+        // Legend
+        $svgContent .= '<rect x="' . ($svgWidth - 150) . '" y="10" width="10" height="10" fill="#4e73df" />';
+        $svgContent .= '<text x="' . ($svgWidth - 135) . '" y="19" font-family="sans-serif" font-size="11" fill="#333">Data Aktual</text>';
+        $svgContent .= '<rect x="' . ($svgWidth - 70) . '" y="10" width="10" height="10" fill="none" stroke="#1cc88a" stroke-width="2" stroke-dasharray="4" />';
+        $svgContent .= '<text x="' . ($svgWidth - 55) . '" y="19" font-family="sans-serif" font-size="11" fill="#333">Prediksi</text>';
+
+        $svgContent .= '</svg>';
+
+        $chartImage = 'data:image/svg+xml;base64,' . base64_encode($svgContent);
+
+        $pdf = Pdf::loadView('pdf.peramalan_sma', compact('peramalan', 'metrics', 'table', 'chartImage'));
+        $pdf->setPaper('a4', 'portrait');
+        $pdf->setOptions(['dpi' => 150, 'isHtml5ParserEnabled' => true, 'isRemoteEnabled' => true]);
+        return $pdf->download('laporan_sma_' . $peramalan->created_at->format('YmdHis') . '.pdf');
     }
 
     private function getMonthName($monthNum)

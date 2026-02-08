@@ -6,6 +6,7 @@ use App\Models\Kendaraan;
 use App\Models\Perbandingan;
 use Illuminate\Http\Request;
 use App\Models\PemakaianKendaraan;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class PerbandinganController extends Controller
 {
@@ -347,5 +348,133 @@ class PerbandinganController extends Controller
     {
         Perbandingan::findOrFail($id)->delete();
         return redirect()->route('perbandingan.index')->with('success', 'Riwayat perbandingan berhasil dihapus.');
+    }
+
+    public function exportPdf($id)
+    {
+        $perbandingan = Perbandingan::with('kendaraan')->findOrFail($id);
+
+        // 1. Ambil Data Chart
+        $data = $perbandingan->data_perbandingan;
+        if (is_string($data)) {
+            $data = json_decode($data, true);
+        }
+
+        // Structure: $data['chart']['labels/actual'], $data['sma']['data'], $data['tes']['data']
+        $labels = $data['chart']['labels'] ?? [];
+        $actuals = $data['chart']['actual'] ?? [];
+        $smaData = $data['sma']['data'] ?? [];
+        $tesData = $data['tes']['data'] ?? [];
+
+        // --- SVG Generation Logic ---
+
+        $allValues = array_merge(
+            array_filter($actuals, fn($v) => $v !== null),
+            array_filter($smaData, fn($v) => $v !== null),
+            array_filter($tesData, fn($v) => $v !== null)
+        );
+        $minY = empty($allValues) ? 0 : min($allValues);
+        $maxY = empty($allValues) ? 100 : max($allValues);
+
+        // Padding Y
+        $padding = ($maxY - $minY) * 0.1;
+        if ($padding == 0) $padding = 10;
+        $minY = max(0, $minY - $padding);
+        $maxY = $maxY + $padding;
+
+        // Dimensions
+        $svgWidth = 1000;
+        $svgHeight = 300;
+        $paddingLeft = 50;
+        $paddingBottom = 30;
+        $graphWidth = $svgWidth - $paddingLeft;
+        $graphHeight = $svgHeight - $paddingBottom;
+
+        $count = count($labels);
+        $stepX = $graphWidth / max(1, $count - 1);
+
+        $getY = function ($val) use ($graphHeight, $minY, $maxY) {
+            if ($val === null) return null;
+            $range = max(1, $maxY - $minY);
+            $ratio = ($val - $minY) / $range;
+            return $graphHeight - ($ratio * $graphHeight);
+        };
+
+        $actualPoints = [];
+        $smaPoints = [];
+        $tesPoints = [];
+
+        foreach ($labels as $i => $label) {
+            $x = $paddingLeft + ($i * $stepX);
+
+            $yAct = $getY($actuals[$i] ?? null);
+            if ($yAct !== null) $actualPoints[] = "$x,$yAct";
+
+            $ySma = $getY($smaData[$i] ?? null);
+            if ($ySma !== null) $smaPoints[] = "$x,$ySma";
+
+            $yTes = $getY($tesData[$i] ?? null);
+            if ($yTes !== null) $tesPoints[] = "$x,$yTes";
+        }
+
+        // Build SVG String
+        $svgContent = '<svg width="' . $svgWidth . '" height="' . $svgHeight . '" viewBox="0 0 ' . $svgWidth . ' ' . $svgHeight . '" xmlns="http://www.w3.org/2000/svg">';
+        $svgContent .= '<rect x="0" y="0" width="' . $svgWidth . '" height="' . $svgHeight . '" fill="none" stroke="#f0f0f0" stroke-width="1" />';
+
+        // Grid Lines
+        for ($i = 0; $i <= 4; $i++) {
+            $y = ($svgHeight - $paddingBottom) - ($i * ($svgHeight - $paddingBottom - 20) / 4);
+            $val = $minY + ($i * ($maxY - $minY) / 4);
+            $svgContent .= '<line x1="' . $paddingLeft . '" y1="' . $y . '" x2="' . $svgWidth . '" y2="' . $y . '" stroke="#e6e6e6" stroke-width="1" stroke-dasharray="4" />';
+            $svgContent .= '<text x="' . ($paddingLeft - 5) . '" y="' . ($y + 3) . '" font-family="sans-serif" font-size="10" fill="#888" text-anchor="end">' . number_format($val, 0) . '</text>';
+        }
+
+        // Lines
+        $actPts = implode(' ', $actualPoints);
+        $smaPts = implode(' ', $smaPoints);
+        $tesPts = implode(' ', $tesPoints);
+
+        // Actual - Blue
+        $svgContent .= '<polyline points="' . $actPts . '" fill="none" stroke="#4e73df" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />';
+        // SMA - Green
+        $svgContent .= '<polyline points="' . $smaPts . '" fill="none" stroke="#1cc88a" stroke-width="2" stroke-dasharray="5,5" stroke-linecap="round" stroke-linejoin="round"/>';
+        // TES - Yellow
+        $svgContent .= '<polyline points="' . $tesPts . '" fill="none" stroke="#f6c23e" stroke-width="2" stroke-dasharray="5,5" stroke-linecap="round" stroke-linejoin="round"/>';
+
+        // X Labels with Skipping
+        $skip = 1;
+        if ($count > 12) {
+            $skip = ceil($count / 12);
+        }
+
+        foreach ($labels as $i => $label) {
+            $x = $paddingLeft + ($i * $stepX);
+            $y = $svgHeight - 10;
+            if ($i == 0 || $i == $count - 1 || $i % $skip == 0) {
+                $svgContent .= '<text x="' . $x . '" y="' . $y . '" font-family="sans-serif" font-size="9" fill="#666" text-anchor="middle">' . $label . '</text>';
+            }
+        }
+
+        // Legend
+        $l1 = $svgWidth - 250;
+        $svgContent .= '<rect x="' . $l1 . '" y="10" width="10" height="10" fill="#4e73df" />';
+        $svgContent .= '<text x="' . ($l1 + 15) . '" y="19" font-family="sans-serif" font-size="11" fill="#333">Actual</text>';
+
+        $l2 = $l1 + 60;
+        $svgContent .= '<rect x="' . $l2 . '" y="10" width="10" height="10" fill="none" stroke="#1cc88a" stroke-width="2" stroke-dasharray="4" />';
+        $svgContent .= '<text x="' . ($l2 + 15) . '" y="19" font-family="sans-serif" font-size="11" fill="#333">SMA</text>';
+
+        $l3 = $l2 + 50;
+        $svgContent .= '<rect x="' . $l3 . '" y="10" width="10" height="10" fill="none" stroke="#f6c23e" stroke-width="2" stroke-dasharray="4" />';
+        $svgContent .= '<text x="' . ($l3 + 15) . '" y="19" font-family="sans-serif" font-size="11" fill="#333">TES</text>';
+
+        $svgContent .= '</svg>';
+
+        $chartImage = 'data:image/svg+xml;base64,' . base64_encode($svgContent);
+
+        $pdf = Pdf::loadView('pdf.perbandingan', compact('perbandingan', 'chartImage'));
+        $pdf->setPaper('a4', 'portrait');
+        $pdf->setOptions(['dpi' => 150, 'isHtml5ParserEnabled' => true, 'isRemoteEnabled' => true]);
+        return $pdf->download('laporan_perbandingan_' . $perbandingan->created_at->format('YmdHis') . '.pdf');
     }
 }

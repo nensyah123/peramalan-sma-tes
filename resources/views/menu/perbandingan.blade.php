@@ -207,6 +207,9 @@
                             <button class="btn btn-info btn-sm btn-circle" title="Detail" onclick='showDetail(@json($item))'>
                                 <i class="fas fa-eye"></i>
                             </button>
+                            <a href="{{ route('perbandingan.export_pdf', $item->id) }}" class="btn btn-warning btn-sm btn-circle" title="Export PDF" target="_blank">
+                                <i class="fas fa-file-pdf"></i>
+                            </a>
                             <form action="{{ route('perbandingan.destroy', $item->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Hapus riwayat ini?')">
                                 @csrf
                                 @method('DELETE')

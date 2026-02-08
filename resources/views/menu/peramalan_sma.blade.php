@@ -135,7 +135,7 @@
                         <input type="hidden" name="mae" value="{{ $mae }}">
                         <input type="hidden" name="mse" value="{{ $mse }}">
                         <input type="hidden" name="mape" value="{{ $mape }}">
-                        <input type="hidden" name="data_peramalan" value="{{ json_encode($resultTable) }}">
+                        <input type="hidden" name="data_peramalan" value="{{ $data_json }}">
                         <button type="submit" class="btn btn-success mr-2">Simpan Hasil</button>
                     </form>
                     <a href="{{ route('peramalan_sma.index') }}" class="btn btn-secondary">Buang</a>
@@ -180,6 +180,9 @@
                             <button class="btn btn-info btn-sm btn-circle" title="Detail" onclick='showDetail(@json($item))'>
                                 <i class="fas fa-eye"></i>
                             </button>
+                            <a href="{{ route('peramalan_sma.export_pdf', $item->id) }}" class="btn btn-warning btn-sm btn-circle" title="Export PDF" target="_blank">
+                                <i class="fas fa-file-pdf"></i>
+                            </a>
                             <form action="{{ route('peramalan_sma.destroy', $item->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Hapus riwayat ini?')">
                                 @csrf
                                 @method('DELETE')

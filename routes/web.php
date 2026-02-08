@@ -33,17 +33,20 @@ Route::middleware('auth')->group(function () {
   Route::get('/peramalan-smp', [PeramalanSmaController::class, 'index'])->name('peramalan_sma.index');
   Route::post('/peramalan-smp', [PeramalanSmaController::class, 'process'])->name('peramalan_sma.process');
   Route::post('/peramalan-smp/store', [PeramalanSmaController::class, 'store'])->name('peramalan_sma.store');
+  Route::get('/peramalan-smp/export-pdf/{id}', [PeramalanSmaController::class, 'exportPdf'])->name('peramalan_sma.export_pdf');
   Route::delete('/peramalan-smp/{id}', [PeramalanSmaController::class, 'destroy'])->name('peramalan_sma.destroy');
 
   // Peramalan TES
   Route::get('/peramalan-tes', [PeramalanTesController::class, 'index'])->name('peramalan_tes.index');
   Route::post('/peramalan-tes', [PeramalanTesController::class, 'process'])->name('peramalan_tes.process');
   Route::post('/peramalan-tes/store', [PeramalanTesController::class, 'store'])->name('peramalan_tes.store');
+  Route::get('/peramalan-tes/export-pdf/{id}', [PeramalanTesController::class, 'exportPdf'])->name('peramalan_tes.export_pdf');
   Route::delete('/peramalan-tes/{id}', [PeramalanTesController::class, 'destroy'])->name('peramalan_tes.destroy');
 
   // Perbandingan
   Route::get('/perbandingan', [PerbandinganController::class, 'index'])->name('perbandingan.index');
   Route::post('/perbandingan', [PerbandinganController::class, 'process'])->name('perbandingan.process');
   Route::post('/perbandingan/store', [PerbandinganController::class, 'store'])->name('perbandingan.store');
+  Route::get('/perbandingan/export-pdf/{id}', [PerbandinganController::class, 'exportPdf'])->name('perbandingan.export_pdf');
   Route::delete('/perbandingan/{id}', [PerbandinganController::class, 'destroy'])->name('perbandingan.destroy');
 });
