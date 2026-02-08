@@ -2,40 +2,43 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Kendaraan;
+use App\Models\PeramalanSma;
+use App\Models\PeramalanTes;
 use Illuminate\Http\Request;
+use App\Models\PemakaianKendaraan;
 
 class DashboardController extends Controller
 {
     public function index(Request $request)
     {
-        // 1. CARDS DATA
-        $countKendaraan = \App\Models\Kendaraan::count();
-        $totalTransaksi = \App\Models\PemakaianKendaraan::sum('jumlah_transaksi');
-        $countSma = \App\Models\PeramalanSma::count();
-        $countTes = \App\Models\PeramalanTes::count(); // Assuming Model exists, user mentioned 'Peramalan_Tes' count
+        // 1. Data Kartu (Statistik Utama)
+        $countKendaraan = Kendaraan::count();
+        $totalTransaksi = PemakaianKendaraan::sum('jumlah_transaksi');
+        $countSma = PeramalanSma::count();
+        $countTes = PeramalanTes::count();
 
-        // 3. DONUT CHART (Pie Chart) - Transaksi per Kendaraan
-        // Group by vehicle
-        $vehicles = \App\Models\Kendaraan::all();
+        // 2. Grafik Donat (Transaksi per Kendaraan)
+        $vehicles = Kendaraan::all();
         $donutLabels = [];
         $donutData = [];
-        $colors = ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b', '#858796', '#5a5c69']; // Example palette
-        
+
         foreach ($vehicles as $v) {
-            $sum = \App\Models\PemakaianKendaraan::where('id_kendaraan', $v->id)->sum('jumlah_transaksi');
-            // Include even if 0? Maybe not to keep chart clean.
+            $sum = PemakaianKendaraan::where('id_kendaraan', $v->id)->sum('jumlah_transaksi');
+
+            // Hanya masukkan jika ada transaksi
             if ($sum > 0) {
-                 $donutLabels[] = $v->merk . ' ' . $v->nama_kendaraan; 
-                 $donutData[] = $sum;
+                $donutLabels[] = $v->merk . ' ' . $v->nama_kendaraan;
+                $donutData[] = $sum;
             }
         }
 
-        // 2. AREA CHART (Line Chart) - Data Aktual Transaksi
-        // Allows filtering by vehicle via ID, defaults to first vehicle
+        // 3. Grafik Area (Data Aktual Transaksi)
+        // Filter berdasarkan ID kendaraan (default ke kendaraan pertama)
         $selectedVehicleId = $request->query('vehicle_id');
-        
+
         if ($selectedVehicleId) {
-            $selectedVehicle = \App\Models\Kendaraan::find($selectedVehicleId);
+            $selectedVehicle = Kendaraan::find($selectedVehicleId);
         } else {
             $selectedVehicle = $vehicles->first();
         }
@@ -45,24 +48,31 @@ class DashboardController extends Controller
         $vehicleName = $selectedVehicle ? ($selectedVehicle->merk . ' ' . $selectedVehicle->nama_kendaraan) : 'Data Kosong';
 
         if ($selectedVehicle) {
-            $transaksis = \App\Models\PemakaianKendaraan::where('id_kendaraan', $selectedVehicle->id)
-                            ->orderBy('tahun', 'asc')
-                            ->orderBy('bulan', 'asc')
-                            ->get();
-            
+            $transaksis = PemakaianKendaraan::where('id_kendaraan', $selectedVehicle->id)
+                ->orderBy('tahun', 'asc')
+                ->orderBy('bulan', 'asc')
+                ->get();
+
             foreach ($transaksis as $t) {
                 $dateObj   = \DateTime::createFromFormat('!m', $t->bulan);
-                $monthName = $dateObj->format('M'); // Jan, Feb...
+                $monthName = $dateObj->format('M');
                 $lineLabels[] = $monthName . ' ' . $t->tahun;
                 $lineData[] = $t->jumlah_transaksi;
             }
         }
 
         return view('menu.dashboard', compact(
-            'countKendaraan', 'totalTransaksi', 'countSma', 'countTes',
-            'donutLabels', 'donutData',
-            'lineLabels', 'lineData', 'vehicleName',
-            'vehicles', 'selectedVehicle'
+            'countKendaraan',
+            'totalTransaksi',
+            'countSma',
+            'countTes',
+            'donutLabels',
+            'donutData',
+            'lineLabels',
+            'lineData',
+            'vehicleName',
+            'vehicles',
+            'selectedVehicle'
         ));
     }
 }

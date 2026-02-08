@@ -34,32 +34,28 @@ class PerbandinganController extends Controller
         $beta = $request->beta;
         $gamma = $request->gamma;
 
-        // Fetch Data
+        // Ambil Data Historis
         $dataPemakaian = PemakaianKendaraan::where('id_kendaraan', $id_kendaraan)
             ->orderBy('tahun', 'asc')
             ->orderBy('bulan', 'asc')
             ->get();
 
         if ($dataPemakaian->count() < 12) {
-            return back()->with('error', 'Data historis minimal 12 bulan diperlukan untuk perbandingan (karena TES).');
+            return back()->with('error', 'Data historis minimal 12 bulan diperlukan untuk perbandingan (karena metode TES membutuhkan 1 siklus tahunan).');
         }
 
-        // Calculate Only
+        // Lakukan Perhitungan
         $smaResult = $this->calculateSMA($dataPemakaian, $periode_sma, $durasi);
         $tesResult = $this->calculateTES($dataPemakaian, $alpha, $beta, $gamma, $durasi);
 
+        // Tentukan Metode Terbaik (berdasarkan MAPE terendah)
         $metode_terbaik = ($smaResult['metrics']['mape'] < $tesResult['metrics']['mape']) ? 'SMA' : 'TES';
 
-        // Prepare Chart Data
-        // Merge labels? Both use same future dates logic so labels should be identical if base data is same.
+        // Siapkan Data Grafik
         $chartLabels = $smaResult['chart']['labels'];
         $actualData = $smaResult['chart']['actual'];
-        $smaData = $smaResult['chart']['predicted']; // This includes history predictions? SMA only predicts from n+1.
+        $smaData = $smaResult['chart']['predicted'];
         $tesData = $tesResult['chart']['predicted'];
-
-        // Align arrays if start points differ?
-        // SMA starts predicting at n+1. TES starts at L+1.
-        // Chart.js handles nulls. My logic in SMA/TES returns full length arrays corresponding to labels.
 
         $result = [
             'sma' => ['mae' => $smaResult['metrics']['mae'], 'mse' => $smaResult['metrics']['mse'], 'mape' => $smaResult['metrics']['mape'], 'data' => $smaData],
@@ -68,7 +64,7 @@ class PerbandinganController extends Controller
             'best' => $metode_terbaik
         ];
 
-        /* Variables for View */
+        /* Variabel untuk Tampilan */
         $mae_sma = $smaResult['metrics']['mae'];
         $mse_sma = $smaResult['metrics']['mse'];
         $mape_sma = $smaResult['metrics']['mape'];
@@ -109,10 +105,11 @@ class PerbandinganController extends Controller
         $total_error_sqr = 0;
         $total_ape = 0;
         $count_error = 0;
-        $predictions = []; // Aligned with data 0..N-1
+        $predictions = [];
 
         for ($i = 0; $i < count($d); $i++) {
             $prediksi = null;
+            // Hitung SMA jika data mencukupi sesuai periode
             if ($i >= $periode) {
                 $sum = 0;
                 for ($k = 1; $k <= $periode; $k++) $sum += $d[$i - $k]['aktual'];
@@ -126,27 +123,13 @@ class PerbandinganController extends Controller
                 $count_error++;
             }
             $predictions[] = $prediksi;
-            // $d[$i]['prediksi'] = $prediksi;
         }
 
         $mae = ($count_error > 0) ? round($total_error_abs / $count_error, 2) : 0;
         $mse = ($count_error > 0) ? round($total_error_sqr / $count_error, 2) : 0;
         $mape = ($count_error > 0) ? round($total_ape / $count_error, 2) : 0;
 
-        // Forecast
-        $futurePreds = [];
-        $tempData = $d; // Contains 'aktual'
-        // Fill predictions into tempData for rolling forecast? 
-        // Need to loop.
-        // My simple SMA forecast logic:
-        $lastMonth = $d[count($d) - 1]['bulan'];
-        $lastYear = $d[count($d) - 1]['tahun'];
-
-        // Add existing predictions to temp data structure? 
-        // Or simply: rolling calculaton.
-        // For forecast h, we need val at n+h-1... n+h-periode.
-
-        // Let's rebuild full array for chart including forecast
+        // Persiapan Data Grafik
         $chartLabels = [];
         $actualChart = [];
         $predChart = [];
@@ -157,11 +140,14 @@ class PerbandinganController extends Controller
             $predChart[] = $predictions[$i];
         }
 
-        // Extend for Forecast
-        // Need to populate $d with predicted values to use them as 'val' for next steps
+        // --- Peramalan Masa Depan ---
+        // Kita perlu menyalin data aktual ke array sementara untuk perhitungan prediksi berlanjut
         for ($i = 0; $i < count($d); $i++) {
             $d[$i]['prediksi'] = $predictions[$i];
         }
+
+        $lastMonth = $d[count($d) - 1]['bulan'];
+        $lastYear = $d[count($d) - 1]['tahun'];
 
         for ($j = 0; $j < $durasi; $j++) {
             $lastMonth++;
@@ -172,6 +158,7 @@ class PerbandinganController extends Controller
 
             $len = count($d);
             $sum = 0;
+            // Ambil N data terakhir (bisa berupa aktual atau hasil prediksi sebelumnya)
             for ($k = 1; $k <= $periode; $k++) {
                 $idx = $len - $k;
                 $val = isset($d[$idx]['aktual']) ? $d[$idx]['aktual'] : $d[$idx]['prediksi'];
@@ -179,6 +166,7 @@ class PerbandinganController extends Controller
             }
             $predFuture = round($sum / $periode, 2);
 
+            // Tambahkan hasil prediksi ke array data untuk iterasi berikutnya
             $newRow = [
                 'bulan' => $lastMonth,
                 'tahun' => $lastYear,
@@ -204,19 +192,25 @@ class PerbandinganController extends Controller
         foreach ($data as $pem) {
             $d[] = ['aktual' => $pem->jumlah_transaksi, 'bulan' => $pem->bulan, 'tahun' => $pem->tahun];
         }
-        $L = 12;
+        $L = 12; // Panjang Musiman (12 bulan)
         $nData = count($d);
 
-        // Init
+        // --- Inisialisasi ---
+
+        // Hitung rata-rata musim pertama
         $avgFirstSeason = 0;
         for ($i = 0; $i < $L; $i++) $avgFirstSeason += $d[$i]['aktual'];
         $avgFirstSeason /= $L;
 
+        // Inisialisasi Musiman (Model Aditif: Data - Rata-rata)
         $seasonals = [];
-        for ($i = 0; $i < $L; $i++) $seasonals[] = $d[$i]['aktual'] / ($avgFirstSeason ?: 1);
+        for ($i = 0; $i < $L; $i++) $seasonals[] = $d[$i]['aktual'] - $avgFirstSeason;
 
+        // Inisialisasi Level dan Trend
         $level = $avgFirstSeason;
         $trend = 0;
+
+        // Jika data cukup (minimal 2 tahun), hitung trend awal dengan lebih akurat
         if ($nData >= 2 * $L) {
             $sumSecond = 0;
             for ($i = $L; $i < 2 * $L; $i++) $sumSecond += $d[$i]['aktual'];
@@ -232,28 +226,37 @@ class PerbandinganController extends Controller
         $total_error_sqr = 0;
         $total_ape = 0;
         $count_error = 0;
-        $predictions = array_fill(0, $L, null); // First L are null preds
+        $predictions = array_fill(0, $L, null); // 12 bulan pertama tidak ada prediksi (masa inisialisasi)
 
+        // --- Iterasi Peramalan (Mulai dari bulan ke-13) ---
         for ($i = $L; $i < $nData; $i++) {
             $prevLevel = $currLevel;
             $prevTrend = $currTrend;
             $seasonalIndexLoc = $i - $L;
             $prevSeasonal = $seasonal_indices[$seasonalIndexLoc];
 
-            $prediksi = ($prevLevel + $prevTrend) * $prevSeasonal;
+            // 1. Prediksi (Aditif)
+            $prediksi = ($prevLevel + $prevTrend) + $prevSeasonal;
             $prediksi = round($prediksi, 2);
             $aktual = $d[$i]['aktual'];
 
+            // Hitung Error
             $err = abs($aktual - $prediksi);
             $total_error_abs += $err;
             $total_error_sqr += pow($err, 2);
             $total_ape += ($aktual != 0) ? ($err / $aktual) * 100 : 0;
             $count_error++;
 
-            // Update
-            $newLevel = $alpha * ($aktual / $prevSeasonal) + (1 - $alpha) * ($prevLevel + $prevTrend);
+            // 2. Pembaruan Parameter (Aditif)
+
+            // Level Baru
+            $newLevel = $alpha * ($aktual - $prevSeasonal) + (1 - $alpha) * ($prevLevel + $prevTrend);
+
+            // Trend Baru
             $newTrend = $beta * ($newLevel - $prevLevel) + (1 - $beta) * $prevTrend;
-            $newSeasonal = $gamma * ($aktual / $newLevel) + (1 - $gamma) * $prevSeasonal;
+
+            // Musiman Baru
+            $newSeasonal = $gamma * ($aktual - $newLevel) + (1 - $gamma) * $prevSeasonal;
 
             $currLevel = $newLevel;
             $currTrend = $newTrend;
@@ -266,8 +269,8 @@ class PerbandinganController extends Controller
         $mse = ($count_error > 0) ? round($total_error_sqr / $count_error, 2) : 0;
         $mape = ($count_error > 0) ? round($total_ape / $count_error, 2) : 0;
 
-        // Forecast
-        $chartLabels = []; // Rebuild
+        // Persiapan Data Grafik
+        $chartLabels = [];
         $actualChart = [];
         $predChart = [];
 
@@ -277,6 +280,7 @@ class PerbandinganController extends Controller
             $predChart[] = isset($predictions[$i]) ? $predictions[$i] : null;
         }
 
+        // --- Peramalan Masa Depan ---
         $lastMonth = $d[$nData - 1]['bulan'];
         $lastYear = $d[$nData - 1]['tahun'];
 
@@ -287,12 +291,15 @@ class PerbandinganController extends Controller
                 $lastYear++;
             }
 
+            // Cari indeks musiman yang sesuai (looping ke belakang jika perlu)
             $s_idx = ($nData + $h - 1) - $L;
             while ($s_idx >= count($seasonal_indices)) $s_idx -= $L;
             if ($s_idx < 0) $s_idx = ($s_idx % $L + $L) % $L;
 
             $S_proj = $seasonal_indices[$s_idx];
-            $predFuture = ($currLevel + $h * $currTrend) * $S_proj;
+
+            // Prediksi Masa Depan (Aditif)
+            $predFuture = ($currLevel + $h * $currTrend) + $S_proj;
             $predFuture = round($predFuture, 2);
 
             $chartLabels[] = $this->getMonthName($lastMonth) . ' ' . $lastYear;
@@ -314,7 +321,8 @@ class PerbandinganController extends Controller
 
     public function store(Request $request)
     {
-        // Validation...
+        // ... (Validasi sudah dilakukan di method process, namun bisa ditambahkan jika perlu)
+
         Perbandingan::create([
             'id_kendaraan' => $request->id_kendaraan,
             'periode_sma' => $request->periode_sma,

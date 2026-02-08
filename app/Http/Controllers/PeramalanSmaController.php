@@ -15,6 +15,7 @@ class PeramalanSmaController extends Controller
         $riwayat = PeramalanSma::with('kendaraan')->latest()->get();
         return view('menu.peramalan_sma', compact('kendaraans', 'riwayat'));
     }
+
     public function process(Request $request)
     {
         $request->validate([
@@ -27,7 +28,7 @@ class PeramalanSmaController extends Controller
         $periode = $request->periode; // n
         $durasi = $request->durasi_prediksi;
 
-        // Fetch Historical Data
+        // Ambil Data Historis
         $dataPemakaian = PemakaianKendaraan::where('id_kendaraan', $id_kendaraan)
             ->orderBy('tahun', 'asc')
             ->orderBy('bulan', 'asc')
@@ -38,7 +39,7 @@ class PeramalanSmaController extends Controller
         }
 
         $resultTable = [];
-        $d = []; // Data array for easier access
+        $d = [];
         foreach ($dataPemakaian as $idx => $pem) {
             $d[] = [
                 'bulan' => $pem->bulan,
@@ -53,28 +54,25 @@ class PeramalanSmaController extends Controller
         $total_ape = 0;
         $count_error = 0;
 
-        // 1. Calculate SMA on History (Testing) from index = $periode (since we need n prior data points)
-        // Adjusting loop to start calculating prediction for index $i based on $i-1...$i-$periode
-        // Actually, prediction for time t uses t-1, t-2... t-n.
-        // So prediction for index $periode (the (n+1)th item) uses index 0 to n-1.
-
+        // 1. Perhitungan SMA pada Data Historis (Pengujian)
         for ($i = 0; $i < count($d); $i++) {
             $prediksi = null;
             $error_abs = null;
             $error_sqr = null;
             $ape = null;
 
+            // Hitung jika data historis sebelumnya mencukupi (>= n)
             if ($i >= $periode) {
                 $sum = 0;
                 for ($k = 1; $k <= $periode; $k++) {
                     $sum += $d[$i - $k]['aktual'];
                 }
                 $prediksi = $sum / $periode;
-
-                // Precision check
                 $prediksi = round($prediksi, 2);
+
                 $aktual = $d[$i]['aktual'];
 
+                // Hitung Error
                 $error_abs = abs($aktual - $prediksi);
                 $error_sqr = pow($error_abs, 2);
                 $ape = ($aktual != 0) ? ($error_abs / $aktual) * 100 : 0;
@@ -90,7 +88,6 @@ class PeramalanSmaController extends Controller
             $d[$i]['error_sqr'] = $error_sqr;
             $d[$i]['ape'] = $ape;
 
-            // Format for table
             $resultTable[] = [
                 'bulan_tahun' => $d[$i]['bulan_tahun'],
                 'aktual' => $d[$i]['aktual'],
@@ -101,44 +98,31 @@ class PeramalanSmaController extends Controller
             ];
         }
 
-        // Metrics
+        // Hitung Rata-rata Error
         $mae = ($count_error > 0) ? round($total_error_abs / $count_error, 2) : 0;
         $mse = ($count_error > 0) ? round($total_error_sqr / $count_error, 2) : 0;
         $mape = ($count_error > 0) ? round($total_ape / $count_error, 2) : 0;
 
-        // 2. Forecast Future
-        // To forecast index T+1... we use moving window.
-        // We append predicted values to be used for next predictions if needed? 
-        // Standard SMA uses ACTUAL data if available. For pure future, we must use predicted data (if we assume no actuals).
-        // OR we just use the last n Actuals to predict T+1. Then (Last n-1 Actuals + T+1 Predicted) to predict T+2?
-        // "Rolling forecast" usually uses predicted values.
-
-        $futureData = [];
-        $tempData = $d; // Copy to extend
-
-        // Last available month/year
+        // 2. Peramalan Masa Depan
+        $tempData = $d;
         $lastMonth = $d[count($d) - 1]['bulan'];
         $lastYear = $d[count($d) - 1]['tahun'];
 
         for ($j = 0; $j < $durasi; $j++) {
-            // Next Date
+            // Update Tanggal
             $lastMonth++;
             if ($lastMonth > 12) {
                 $lastMonth = 1;
                 $lastYear++;
             }
 
-            // Calculate Prediction
-            // Uses last $periode values from $tempData (which might contain mixed actuals and predictions?)
-            // Usually SMA implies using Actuals. If we run out of actuals, we use the predictions we just made.
+            // Hitung Prediksi Masa Depan
+            // Mengambil n nilai terakhir dari tempData (bisa campuran aktual dan prediksi sebelumnya)
             $len = count($tempData);
             $sum = 0;
             for ($k = 1; $k <= $periode; $k++) {
-                // Determine value: if we are in history, use 'aktual'. If future, use 'prediksi'.
-                // Wait, $tempData structure above has 'aktual'.
-                // For future rows, 'aktual' is undefined. We should use 'prediksi' as 'aktual' placeholder for further calc?
-                // Let's use 'val' helper.
                 $idx = $len - $k;
+                // Gunakan aktual jika ada, jika tidak gunakan hasil prediksi sebelumnya
                 if (isset($tempData[$idx]['aktual'])) {
                     $val = $tempData[$idx]['aktual'];
                 } else {
@@ -152,7 +136,7 @@ class PeramalanSmaController extends Controller
                 'bulan' => $lastMonth,
                 'tahun' => $lastYear,
                 'bulan_tahun' => $this->getMonthName($lastMonth) . ' ' . $lastYear,
-                'aktual' => null, // Future
+                'aktual' => null, // Masa depan
                 'prediksi' => $predFuture,
                 'error_abs' => null,
                 'error_sqr' => null,
@@ -170,8 +154,7 @@ class PeramalanSmaController extends Controller
             ];
         }
 
-
-        // Prepare Chart Data
+        // Persiapan Data Grafik
         $chartLabels = [];
         $actualData = [];
         $predictedData = [];
@@ -182,20 +165,15 @@ class PeramalanSmaController extends Controller
             $predictedData[] = $row['prediksi'] !== '-' ? $row['prediksi'] : null;
         }
 
+        // Variabel untuk disimpan (JSON)
         $data_peramalan = [
             'metrics' => ['mae' => $mae, 'mse' => $mse, 'mape' => $mape],
             'table' => $resultTable,
             'chart' => ['labels' => $chartLabels, 'actual' => $actualData, 'predicted' => $predictedData]
         ];
 
-        $data_json = json_encode($data_peramalan); // Not strictly used since blade uses $resultTable directly for table and vars for chart, but good for saving. Hidden input uses json_encode($resultTable). Wait, I should ensure consistency. 
-        // The Blade I wrote uses `json_encode($resultTable)` for the hidden input `data_peramalan`. 
-        // But the `store` method expects `data_peramalan` to be the JSON string.
-        // And the `PeramalanSma` model's `data_peramalan` field stores JSON.
-        // My implementation in `store` uses `json_decode` then creates record.
-        // So the hidden input should be the full JSON structure I want to save.
-        // I'll stick to saving just the table array for now as typical usage, or do I want chart data too? 
-        // The modal reconstructs chart from table data, so saving table is enough.
+        // Variabel untuk modal view (string JSON)
+        $data_json = json_encode($data_peramalan);
 
         $kendaraans = Kendaraan::all();
         $riwayat = PeramalanSma::with('kendaraan')->latest()->get();
@@ -237,7 +215,7 @@ class PeramalanSmaController extends Controller
             'mae' => $request->mae,
             'mse' => $request->mse,
             'mape' => $request->mape,
-            'data_peramalan' => json_decode($request->data_peramalan, true) // Decode to array because Cast handles encoding
+            'data_peramalan' => json_decode($request->data_peramalan, true)
         ]);
 
         return redirect()->route('peramalan_sma.index')->with('success', 'Hasil peramalan berhasil disimpan.');
