@@ -1,115 +1,181 @@
 <!DOCTYPE html>
+
 <html lang="en">
-
 <head>
-
     <meta charset="utf-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <meta name="description" content="">
-    <meta name="author" content="">
-
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Login - Forecasting Nensyah</title>
-    <link rel="icon" href="{{ url('/template/img/logorental.png') }}">
+    <link rel="icon" href="{{ asset('template/img/logorental.png') }}">
 
-    <!-- Custom fonts for this template-->
-    <link href="{{ asset('template/vendor/fontawesome-free/css/all.min.css') }}" rel="stylesheet" type="text/css">
-    <link
-        href="https://fonts.googleapis.com/css?family=Nunito:200,200i,300,300i,400,400i,600,600i,700,700i,800,800i,900,900i"
-        rel="stylesheet">
+```
+<!-- SB Admin -->
+<link href="{{ asset('template/vendor/fontawesome-free/css/all.min.css') }}" rel="stylesheet">
+<link href="{{ asset('template/css/sb-admin-2.min.css') }}" rel="stylesheet">
+```
 
-    <!-- Custom styles for this template-->
-    <link href="{{ asset('template/css/sb-admin-2.min.css') }}" rel="stylesheet">
-    <style>
-        :root {
-            --primary-red: #74271f;
-        }
-        .bg-login-image {
-            background: url("{{ asset('/template/img/logorental.png') }}");
-            background-position: center;
-            background-size: contain;
-            background-repeat: no-repeat;
-        }
-        .btn-primary {
-            background-color: var(--primary-red);
-            border-color: var(--primary-red);
-        }
-        .btn-primary:hover {
-            background-color: #a03023;
-            border-color: #a03023;
-        }
-        body {
-            background-color: #BE4132;
-        }
-    </style>
+<style>
+
+:root{
+    --primary-red:#74271f;
+}
+
+/* ================= BACKGROUND ================= */
+
+body{
+    height:100vh;
+    margin:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+
+    background-image:url("{{ asset('template/img/mobil.png') }}");
+    background-size:cover;
+    background-position:center;
+    background-repeat:no-repeat;
+}
+
+/* Overlay gelap halus */
+body::before{
+    content:"";
+    position:absolute;
+    inset:0;
+    background:rgba(0,0,0,0.30);
+}
+
+/* ================= LOGIN ================= */
+
+.login-wrapper{
+    position:relative;
+    z-index:2;
+    width:420px;
+}
+
+/* Shadow abu premium */
+.login-card{
+    border-radius:22px;
+    padding:45px;
+    background:#ffffff;
+
+    box-shadow:
+        0 20px 60px rgba(120,120,120,0.35),
+        0 8px 20px rgba(150,150,150,0.25);
+
+    transition:.3s ease;
+}
+
+.login-card:hover{
+    transform:translateY(-4px);
+}
+
+/* ===== LOGO TAJAM ===== */
+
+.login-logo{
+    height:95px;
+    margin-bottom:25px;
+
+    image-rendering:-webkit-optimize-contrast;
+    image-rendering:crisp-edges;
+
+    filter:contrast(1.1) saturate(1.05);
+}
+
+/* Input */
+.form-control{
+    border-radius:14px;
+    height:48px;
+    border:1px solid #ddd;
+    padding-left:15px;
+}
+
+.form-control:focus{
+    border-color:var(--primary-red);
+    box-shadow:0 0 0 3px rgba(116,39,31,0.15);
+}
+
+/* Tombol */
+.btn-primary{
+    background:var(--primary-red);
+    border:none;
+    border-radius:14px;
+    height:48px;
+    font-weight:700;
+    letter-spacing:.5px;
+
+    box-shadow:0 6px 18px rgba(150,150,150,.35);
+    transition:.3s;
+}
+
+.btn-primary:hover{
+    background:#a03023;
+    transform:translateY(-2px);
+}
+
+/* Responsive */
+@media(max-width:500px){
+
+    .login-wrapper{
+        width:90%;
+    }
+
+    .login-card{
+        padding:35px 25px;
+    }
+
+}
+
+</style>
 
 </head>
 
-<body class="bg-gradient-primary" style="background-color: #BE4132; background-image:none;">
+<body>
 
-    <div class="container">
+<div class="login-wrapper">
 
-        <!-- Outer Row -->
-        <div class="row justify-content-center">
+```
+<div class="login-card text-center">
 
-            <div class="col-xl-6 col-lg-8 col-md-9">
+    <img src="{{ asset('template/img/logorental.png') }}"
+         class="login-logo"
+         alt="Logo Rental">
 
-                <div class="card o-hidden border-0 shadow-lg my-5">
-                    <div class="card-body p-0">
-                        <!-- Nested Row within Card Body -->
-                        <div class="row">
-                           {{-- <div class="col-lg-6 d-none d-lg-block bg-login-image"></div> --}}
-                            <div class="col-lg-12">
-                                <div class="p-5">
-                                    <div class="text-center mb-4">
-                                        <img src="{{ url('/template/img/logorental.png') }}" alt="Logo" style="height: 80px;">
-                                        {{-- <h1 class="h4 text-gray-900 mb-4 mt-3">Perbandingan Metode Simple Moving Average dan Metode Exponential Smoothing</h1> --}}
-                                    </div>
-                                    <form class="user" action="{{ route('login.authenticate') }}" method="POST">
-                                        @csrf
-                                        <div class="form-group">
-                                            <input type="email" class="form-control form-control-user"
-                                                id="email" name="email" aria-describedby="emailHelp"
-                                                placeholder="Enter Email Address..." value="{{ old('email') }}" required autofocus>
-                                            @error('email')
-                                                <span class="text-danger small pl-3">{{ $message }}</span>
-                                            @enderror
-                                        </div>
-                                        <div class="form-group">
-                                            <input type="password" class="form-control form-control-user"
-                                                id="password" name="password" placeholder="Password" required>
-                                        </div>
+    <form action="{{ route('login.authenticate') }}" method="POST">
+        @csrf
 
-                                        <button type="submit" class="btn btn-primary btn-user btn-block">
-                                            Login
-                                        </button>
-                                    </form>
-                                    <hr>
-                                    <div class="text-center">
-                                        {{-- <a class="small" href="#">Forgot Password?</a> --}}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+        <div class="form-group text-left">
+            <input type="email"
+                   name="email"
+                   class="form-control"
+                   placeholder="Masukkan Email"
+                   value="{{ old('email') }}"
+                   required autofocus>
 
-            </div>
-
+            @error('email')
+                <small class="text-danger">{{ $message }}</small>
+            @enderror
         </div>
 
-    </div>
+        <div class="form-group text-left">
+            <input type="password"
+                   name="password"
+                   class="form-control"
+                   placeholder="Masukkan Password"
+                   required>
+        </div>
 
-    <!-- Bootstrap core JavaScript-->
-    <script src="{{ asset('template/vendor/jquery/jquery.min.js') }}"></script>
-    <script src="{{ asset('template/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+        <button class="btn btn-primary btn-block">
+            LOGIN
+        </button>
 
-    <!-- Core plugin JavaScript-->
-    <script src="{{ asset('template/vendor/jquery-easing/jquery.easing.min.js') }}"></script>
+    </form>
 
-    <!-- Custom scripts for all pages-->
-    <script src="{{ asset('template/js/sb-admin-2.min.js') }}"></script>
+</div>
+```
+
+</div>
+
+<script src="{{ asset('template/vendor/jquery/jquery.min.js') }}"></script>
+
+<script src="{{ asset('template/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
 
 </body>
-
 </html>

@@ -122,9 +122,9 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <hr>
-                
+
                 <!-- Buttons (Bottom Right) -->
                 <div class="d-flex justify-content-end">
                     <form action="{{ route('peramalan_sma.store') }}" method="POST">
@@ -301,7 +301,7 @@
         if (item.data_peramalan && item.data_peramalan.length > 0) {
             item.data_peramalan.forEach(function(row) {
                 var ape = row.ape; // Might be '-' string or number
-                
+
                 var tr = `
                     <tr>
                         <td>${row.bulan_tahun || '-'}</td>
