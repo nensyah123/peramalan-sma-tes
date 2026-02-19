@@ -298,8 +298,9 @@
         var actuals = [];
         var predicteds = [];
 
-        if (item.data_peramalan && item.data_peramalan.length > 0) {
-            item.data_peramalan.forEach(function(row) {
+        if (item.data_peramalan && item.data_peramalan.table && item.data_peramalan.table.length > 0) {
+
+        item.data_peramalan.table.forEach(function(row) {
                 var ape = row.ape; // Might be '-' string or number
 
                 var tr = `

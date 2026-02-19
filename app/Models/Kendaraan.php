@@ -19,6 +19,7 @@ class Kendaraan extends Model
      */
     protected $fillable = [
         'nama_kendaraan',
+        'unit',
     ];
 
     /**

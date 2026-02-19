@@ -16,9 +16,10 @@ return new class extends Migration
             $table->charset = 'armscii8';
             $table->collation = 'armscii8_general_ci';
 
-            $table->id(); 
-            $table->string('nama_kendaraan', 255); 
-            $table->timestamps(); 
+            $table->id();
+            $table->string('nama_kendaraan', 255);
+             $table->integer('unit')->default(0);
+            $table->timestamps();
         });
     }
 
