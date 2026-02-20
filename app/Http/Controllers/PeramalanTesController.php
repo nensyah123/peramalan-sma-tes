@@ -22,16 +22,15 @@ class PeramalanTesController extends Controller
         $request->validate([
             'id_kendaraan' => 'required|exists:kendaraan,id',
             'durasi_prediksi' => 'required|integer|min:1',
-            'alpha' => 'required|numeric|min:0|max:1',
-            'beta' => 'required|numeric|min:0|max:1',
-            'gamma' => 'required|numeric|min:0|max:1',
         ]);
 
         $id_kendaraan = $request->id_kendaraan;
         $durasi = $request->durasi_prediksi;
-        $alpha = $request->alpha;
-        $beta = $request->beta;
-        $gamma = $request->gamma;
+
+        // Hardcoded parameters as requested
+        $alpha = 0.5;
+        $beta = 0.5;
+        $gamma = 0.5;
         $L = 12; // Panjang Musim (Data Bulanan => 12 bulan)
 
         // Ambil Data Historis
@@ -161,7 +160,7 @@ class PeramalanTesController extends Controller
         }
 
         // --- Agregat Metrik Error ---
-        $mae = ($count_error > 0) ? round($total_error_abs / $count_error, 2) : 0;
+        $mad = ($count_error > 0) ? round($total_error_abs / $count_error, 2) : 0;
         $mse = ($count_error > 0) ? round($total_error_sqr / $count_error, 2) : 0;
         $mape = ($count_error > 0) ? round($total_ape / $count_error, 2) : 0;
 
@@ -223,7 +222,7 @@ class PeramalanTesController extends Controller
         return view('menu.peramalan_tes', compact(
             'kendaraans',
             'riwayat',
-            'mae',
+            'mad',
             'mse',
             'mape',
             'chartLabels',
@@ -246,7 +245,7 @@ class PeramalanTesController extends Controller
             'beta' => 'required',
             'gamma' => 'required',
             'durasi_prediksi' => 'required',
-            'mae' => 'required',
+            'mad' => 'required',
             'mse' => 'required',
             'mape' => 'required',
             'data_peramalan' => 'required', // json string
@@ -258,7 +257,7 @@ class PeramalanTesController extends Controller
             'beta' => $request->beta,
             'gamma' => $request->gamma,
             'durasi_prediksi' => $request->durasi_prediksi,
-            'mae' => $request->mae,
+            'mad' => $request->mad,
             'mse' => $request->mse,
             'mape' => $request->mape,
             'data_peramalan' => json_decode($request->data_peramalan, true)
@@ -285,7 +284,7 @@ class PeramalanTesController extends Controller
 
         // 1. Ambil Metrics
         $metrics = [
-            'mae' => $peramalan->mae,
+            'mad' => $peramalan->mad,
             'mse' => $peramalan->mse,
             'mape' => $peramalan->mape
         ];

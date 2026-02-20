@@ -43,10 +43,13 @@ Route::middleware('auth')->group(function () {
   Route::get('/peramalan-tes/export-pdf/{id}', [PeramalanTesController::class, 'exportPdf'])->name('peramalan_tes.export_pdf');
   Route::delete('/peramalan-tes/{id}', [PeramalanTesController::class, 'destroy'])->name('peramalan_tes.destroy');
 
-  // Perbandingan
+  // Perbandingan (Riwayat Peramalan)
   Route::get('/perbandingan', [PerbandinganController::class, 'index'])->name('perbandingan.index');
-  Route::post('/perbandingan', [PerbandinganController::class, 'process'])->name('perbandingan.process');
-  Route::post('/perbandingan/store', [PerbandinganController::class, 'store'])->name('perbandingan.store');
-  Route::get('/perbandingan/export-pdf/{id}', [PerbandinganController::class, 'exportPdf'])->name('perbandingan.export_pdf');
+  Route::get('/perbandingan/{id}', [PerbandinganController::class, 'show'])->name('perbandingan.show'); // Untuk fitur Lihat
+  Route::get('/perbandingan/{id}/compare', [PerbandinganController::class, 'compare'])->name('perbandingan.compare'); // Untuk fitur Pembanding
   Route::delete('/perbandingan/{id}', [PerbandinganController::class, 'destroy'])->name('perbandingan.destroy');
+  // Route::get('/perbandingan/export-pdf/{id}', [PerbandinganController::class, 'exportPdf'])->name('perbandingan.export_pdf'); // Optional layout mismatch fix
+
+  // Analisis Armada
+  Route::get('/analisis-armada', [App\Http\Controllers\AnalisisArmadaController::class, 'index'])->name('analisis_armada.index');
 });

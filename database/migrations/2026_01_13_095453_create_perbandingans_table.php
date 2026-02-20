@@ -24,12 +24,12 @@ return new class extends Migration
             $table->integer('durasi_prediksi');
 
             // Metrics SMA
-            $table->double('mae_sma');
+            $table->double('mad_sma');
             $table->double('mse_sma');
             $table->double('mape_sma');
 
             // Metrics TES
-            $table->double('mae_tes');
+            $table->double('mad_tes');
             $table->double('mse_tes');
             $table->double('mape_tes');
 

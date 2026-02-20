@@ -52,20 +52,6 @@
                             <input type="number" class="form-control" id="durasi_prediksi" name="durasi_prediksi" placeholder="Contoh: 12" required>
                         </div>
                     </div>
-                    <div class="form-row">
-                        <div class="form-group col-md-4">
-                            <label for="alpha">Nilai Alpha</label>
-                            <input type="number" step="0.01" min="0" max="1" class="form-control" id="alpha" name="alpha" placeholder="0 - 1" required>
-                        </div>
-                        <div class="form-group col-md-4">
-                            <label for="beta">Nilai Beta</label>
-                            <input type="number" step="0.01" min="0" max="1" class="form-control" id="beta" name="beta" placeholder="0 - 1" required>
-                        </div>
-                        <div class="form-group col-md-4">
-                            <label for="gamma">Nilai Gamma</label>
-                            <input type="number" step="0.01" min="0" max="1" class="form-control" id="gamma" name="gamma" placeholder="0 - 1" required>
-                        </div>
-                    </div>
                     <button type="submit" class="btn btn-primary btn-block">Proses Peramalan</button>
                 </form>
             </div>
@@ -130,7 +116,7 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr><td>MAE</td><td>{{ $mae }}</td></tr>
+                                    <tr><td>MAD</td><td>{{ $mad }}</td></tr>
                                     <tr><td>MSE</td><td>{{ $mse }}</td></tr>
                                     <tr><td>MAPE</td><td>{{ $mape }} %</td></tr>
                                 </tbody>
@@ -150,7 +136,7 @@
                         <input type="hidden" name="alpha" value="{{ $alpha }}">
                         <input type="hidden" name="beta" value="{{ $beta }}">
                         <input type="hidden" name="gamma" value="{{ $gamma }}">
-                        <input type="hidden" name="mae" value="{{ $mae }}">
+                        <input type="hidden" name="mad" value="{{ $mad }}">
                         <input type="hidden" name="mse" value="{{ $mse }}">
                         <input type="hidden" name="mape" value="{{ $mape }}">
                         <input type="hidden" name="data_peramalan" value="{{ json_encode($resultTable) }}">
@@ -179,7 +165,7 @@
                         <th>Alpha</th>
                         <th>Beta</th>
                         <th>Gamma</th>
-                        <th>MAE</th>
+                        <th>MAD</th>
                         <th>MSE</th>
                         <th>MAPE</th>
                         <th width="10%">Aksi</th>
@@ -193,7 +179,7 @@
                         <td>{{ $item->alfa }}</td> {{-- Model uses alfa --}}
                         <td>{{ $item->beta }}</td>
                         <td>{{ $item->gamma }}</td>
-                        <td>{{ $item->mae }}</td>
+                        <td>{{ $item->mad }}</td>
                         <td>{{ $item->mse }}</td>
                         <td>{{ $item->mape }}%</td>
                         <td>
@@ -277,7 +263,7 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr><td>MAE</td><td id="detail_mae"></td></tr>
+                                    <tr><td>MAD</td><td id="detail_mad"></td></tr>
                                     <tr><td>MSE</td><td id="detail_mse"></td></tr>
                                     <tr><td>MAPE</td><td id="detail_mape"></td></tr>
                                 </tbody>
@@ -310,7 +296,7 @@
         $('#detail_alpha').text(item.alpha);
         $('#detail_beta').text(item.beta);
         $('#detail_gamma').text(item.gamma);
-        $('#detail_mae').text(item.mae);
+        $('#detail_mad').text(item.mad);
         $('#detail_mse').text(item.mse);
         $('#detail_mape').text(item.mape + '%');
         $('#detail_durasi').text(item.durasi_prediksi);

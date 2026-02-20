@@ -100,7 +100,7 @@ class PeramalanSmaController extends Controller
         }
 
         // Hitung Rata-rata Error
-        $mae = ($count_error > 0) ? round($total_error_abs / $count_error, 2) : 0;
+        $mad = ($count_error > 0) ? round($total_error_abs / $count_error, 2) : 0;
         $mse = ($count_error > 0) ? round($total_error_sqr / $count_error, 2) : 0;
         $mape = ($count_error > 0) ? round($total_ape / $count_error, 2) : 0;
 
@@ -168,7 +168,7 @@ class PeramalanSmaController extends Controller
 
         // Variabel untuk disimpan (JSON)
         $data_peramalan = [
-            'metrics' => ['mae' => $mae, 'mse' => $mse, 'mape' => $mape],
+            'metrics' => ['mad' => $mad, 'mse' => $mse, 'mape' => $mape],
             'table' => $resultTable,
             'chart' => ['labels' => $chartLabels, 'actual' => $actualData, 'predicted' => $predictedData]
         ];
@@ -182,7 +182,7 @@ class PeramalanSmaController extends Controller
         return view('menu.peramalan_sma', compact(
             'kendaraans',
             'riwayat',
-            'mae',
+            'mad',
             'mse',
             'mape',
             'chartLabels',
@@ -203,7 +203,7 @@ class PeramalanSmaController extends Controller
             'id_kendaraan' => 'required|exists:kendaraan,id',
             'periode' => 'required',
             'durasi_prediksi' => 'required',
-            'mae' => 'required',
+            'mad' => 'required',
             'mse' => 'required',
             'mape' => 'required',
             'data_peramalan' => 'required', // JSON string
@@ -213,7 +213,7 @@ class PeramalanSmaController extends Controller
             'id_kendaraan' => $request->id_kendaraan,
             'periode_sma' => $request->periode,
             'durasi_prediksi' => $request->durasi_prediksi,
-            'mae' => $request->mae,
+            'mad' => $request->mad,
             'mse' => $request->mse,
             'mape' => $request->mape,
             'data_peramalan' => json_decode($request->data_peramalan, true)
@@ -234,7 +234,7 @@ class PeramalanSmaController extends Controller
 
         // 1. Ambil Metrics dari kolom database (bukan dari JSON)
         $metrics = [
-            'mae' => $peramalan->mae,
+            'mad' => $peramalan->mad,
             'mse' => $peramalan->mse,
             'mape' => $peramalan->mape
         ];

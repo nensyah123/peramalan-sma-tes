@@ -114,7 +114,7 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr><td>MAE</td><td>{{ $mae }}</td></tr>
+                                    <tr><td>MAD</td><td>{{ $mad }}</td></tr>
                                     <tr><td>MSE</td><td>{{ $mse }}</td></tr>
                                     <tr><td>MAPE</td><td>{{ $mape }} %</td></tr>
                                 </tbody>
@@ -132,7 +132,7 @@
                         <input type="hidden" name="id_kendaraan" value="{{ $id_kendaraan }}">
                         <input type="hidden" name="periode" value="{{ $periode }}">
                         <input type="hidden" name="durasi_prediksi" value="{{ $durasi }}">
-                        <input type="hidden" name="mae" value="{{ $mae }}">
+                        <input type="hidden" name="mad" value="{{ $mad }}">
                         <input type="hidden" name="mse" value="{{ $mse }}">
                         <input type="hidden" name="mape" value="{{ $mape }}">
                         <input type="hidden" name="data_peramalan" value="{{ $data_json }}">
@@ -160,7 +160,7 @@
                         <th>Kendaraan</th>
                         <th>Periode (n)</th>
                         <th>Durasi Prediksi</th>
-                        <th>MAE</th>
+                        <th>MAD</th>
                         <th>MSE</th>
                         <th>MAPE</th>
                         <th width="10%">Aksi</th>
@@ -173,7 +173,7 @@
                         <td>{{ $item->kendaraan->nama_kendaraan }}</td>
                         <td>{{ $item->periode_sma }}</td>
                         <td>{{ $item->durasi_prediksi }}</td>
-                        <td>{{ $item->mae }}</td>
+                        <td>{{ $item->mad }}</td>
                         <td>{{ $item->mse }}</td>
                         <td>{{ $item->mape }}%</td>
                         <td>
@@ -254,7 +254,7 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr><td>MAE</td><td id="detail_mae"></td></tr>
+                                    <tr><td>MAD</td><td id="detail_mad"></td></tr>
                                     <tr><td>MSE</td><td id="detail_mse"></td></tr>
                                     <tr><td>MAPE</td><td id="detail_mape"></td></tr>
                                 </tbody>
@@ -286,7 +286,7 @@
         $('#detail_kendaraan').text(item.kendaraan.nama_kendaraan);
         $('#detail_periode').text(item.periode_sma);
         $('#detail_durasi').text(item.durasi_prediksi);
-        $('#detail_mae').text(item.mae);
+        $('#detail_mad').text(item.mad);
         $('#detail_mse').text(item.mse);
         $('#detail_mape').text(item.mape + '%');
 

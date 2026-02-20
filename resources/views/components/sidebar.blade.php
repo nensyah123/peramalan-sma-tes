@@ -75,10 +75,10 @@
 
             <div class="collapse-inner">
 
-                <a class="collapse-item {{ Request::is('peramalan-smp*') ? 'active' : '' }}"
+                {{-- <a class="collapse-item {{ Request::is('peramalan-smp*') ? 'active' : '' }}"
                    href="{{ url('/peramalan-smp') }}">
                     Simple Moving Average
-                </a>
+                </a> --}}
 
                 <a class="collapse-item {{ Request::is('peramalan-tes*') ? 'active' : '' }}"
                    href="{{ url('/peramalan-tes') }}">
@@ -95,8 +95,15 @@
 
     <li class="nav-item {{ Request::is('perbandingan*') ? 'active' : '' }}">
         <a class="nav-link" href="{{ url('/perbandingan') }}">
-            <i class="fas fa-fw fa-table"></i>
-            <span>Perbandingan</span>
+            <i class="fas fa-fw fa-history"></i>
+            <span>Riwayat Peramalan</span>
+        </a>
+    </li>
+
+    <li class="nav-item {{ Request::is('analisis-armada*') ? 'active' : '' }}">
+        <a class="nav-link" href="{{ url('/analisis-armada') }}">
+            <i class="fas fa-fw fa-chart-bar"></i>
+            <span>Analisis Armada</span>
         </a>
     </li>
 

@@ -27,7 +27,7 @@ return new class extends Migration
             
             $table->integer('durasi_prediksi');
             
-            $table->double('mae', 15, 8)->nullable()->default(0);
+            $table->double('mad', 15, 8)->nullable()->default(0);
             $table->double('mse', 15, 8)->nullable()->default(0);
             $table->double('mape', 15, 8)->nullable()->default(0);
             

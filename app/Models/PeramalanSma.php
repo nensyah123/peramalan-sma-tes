@@ -15,7 +15,7 @@ class PeramalanSma extends Model
         'id_kendaraan',
         'periode_sma',
         'durasi_prediksi',
-        'mae',
+        'mad',
         'mse',
         'mape',
         'data_peramalan',
@@ -27,7 +27,7 @@ class PeramalanSma extends Model
      */
     protected $casts = [
         'data_peramalan' => 'array',
-        'mae' => 'double',
+        'mad' => 'double',
         'mse' => 'double',
         'mape' => 'double',
     ];

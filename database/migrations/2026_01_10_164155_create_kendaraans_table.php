@@ -18,7 +18,7 @@ return new class extends Migration
 
             $table->id();
             $table->string('nama_kendaraan', 255);
-             $table->integer('unit')->default(0);
+            $table->integer('unit')->default(0);
             $table->timestamps();
         });
     }
