@@ -74,17 +74,10 @@
              data-parent="#accordionSidebar">
 
             <div class="collapse-inner">
-
-                {{-- <a class="collapse-item {{ Request::is('peramalan-smp*') ? 'active' : '' }}"
-                   href="{{ url('/peramalan-smp') }}">
-                    Simple Moving Average
-                </a> --}}
-
                 <a class="collapse-item {{ Request::is('peramalan-tes*') ? 'active' : '' }}"
                    href="{{ url('/peramalan-tes') }}">
                     Triple Exponential Smoothing
                 </a>
-
             </div>
         </div>
     </li>
@@ -92,13 +85,6 @@
     <hr class="sidebar-divider">
 
     <div class="sidebar-heading">Hasil</div>
-
-    <li class="nav-item {{ Request::is('perbandingan*') ? 'active' : '' }}">
-        <a class="nav-link" href="{{ url('/perbandingan') }}">
-            <i class="fas fa-fw fa-history"></i>
-            <span>Riwayat Peramalan</span>
-        </a>
-    </li>
 
     <li class="nav-item {{ Request::is('analisis-armada*') ? 'active' : '' }}">
         <a class="nav-link" href="{{ url('/analisis-armada') }}">

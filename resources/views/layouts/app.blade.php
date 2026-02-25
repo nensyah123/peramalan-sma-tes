@@ -13,7 +13,6 @@
     <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 
-
     <!-- Custom fonts for this template-->
     <link href="{{ asset('template/vendor/fontawesome-free/css/all.min.css') }}" rel="stylesheet" type="text/css">
     <link
@@ -24,6 +23,22 @@
     <link href="{{ asset('template/css/sb-admin-2.min.css') }}" rel="stylesheet">
     <link href="{{ asset('template/vendor/datatables/dataTables.bootstrap4.min.css') }}" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <!-- Fix sidebar menu text terpotong -->
+    <style>
+        .sidebar .nav-item .collapse .collapse-inner .collapse-item,
+        .sidebar .nav-item .collapsing .collapse-inner .collapse-item {
+            white-space: normal !important;
+            line-height: 1.3;
+        }
+
+        @media (min-width: 768px) {
+            .sidebar .nav-item .collapse,
+            .sidebar .nav-item .collapsing {
+                min-width: 200px;
+            }
+        }
+    </style>
 
     <!-- Scripts and Styles -->
     @vite(['resources/css/app.scss', 'resources/js/app.js'])
@@ -104,10 +119,6 @@
 
     <!-- Page level plugins -->
     <script src="{{ asset('template/vendor/chart.js/Chart.min.js') }}"></script>
-
-    <!-- Page level custom scripts -->
-    {{-- <script src="{{ asset('template/js/demo/chart-area-demo.js') }}"></script> --}}
-    {{-- <script src="{{ asset('template/js/demo/chart-pie-demo.js') }}"></script> --}}
 
     <script src="{{ asset('template/vendor/datatables/jquery.dataTables.min.js') }}"></script>
     <script src="{{ asset('template/vendor/datatables/dataTables.bootstrap4.min.js') }}"></script>

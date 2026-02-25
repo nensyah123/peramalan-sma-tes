@@ -59,7 +59,7 @@
     </div>
 </div>
 
-<!-- Result Card (Placeholder Structure) -->
+<!-- Result Card -->
 @if(isset($showResult) && $showResult)
 <div class="row" id="result-card">
     <div class="col-xl-12 col-lg-12 mb-4">
@@ -68,8 +68,7 @@
                 <h6 class="m-0 font-weight-bold text-primary">Hasil Prediksi TES</h6>
             </div>
             <div class="card-body">
-                <!-- Detailed Table (Top) -->
-                 <div class="table-responsive mb-4">
+                <div class="table-responsive mb-4">
                     <table class="table table-bordered" width="100%" cellspacing="0">
                         <thead>
                             <tr>
@@ -99,13 +98,11 @@
                 </div>
 
                 <div class="row">
-                    <!-- Chart -->
                     <div class="col-lg-8">
                          <div class="chart-area">
                             <canvas id="tesChart"></canvas>
                         </div>
                     </div>
-                    <!-- Metrics -->
                     <div class="col-lg-4">
                         <div class="table-responsive">
                             <table class="table table-bordered table-sm">
@@ -124,10 +121,9 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <hr>
-                
-                <!-- Buttons (Bottom Right) -->
+
                 <div class="d-flex justify-content-end">
                     <form action="{{ route('peramalan_tes.store') }}" method="POST">
                         @csrf
@@ -165,10 +161,11 @@
                         <th>Alpha</th>
                         <th>Beta</th>
                         <th>Gamma</th>
+                        <th>Jumlah Periode</th>
                         <th>MAD</th>
                         <th>MSE</th>
                         <th>MAPE</th>
-                        <th width="10%">Aksi</th>
+                        <th width="15%">Aksi</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -176,9 +173,10 @@
                     <tr>
                         <td>{{ $index + 1 }}</td>
                         <td>{{ $item->kendaraan->nama_kendaraan ?? '-' }}</td>
-                        <td>{{ $item->alfa }}</td> {{-- Model uses alfa --}}
+                        <td>{{ $item->alfa }}</td>
                         <td>{{ $item->beta }}</td>
                         <td>{{ $item->gamma }}</td>
+                        <td>{{ $item->durasi_prediksi ?? '-' }}</td>
                         <td>{{ $item->mad }}</td>
                         <td>{{ $item->mse }}</td>
                         <td>{{ $item->mape }}%</td>
@@ -186,7 +184,10 @@
                             <button class="btn btn-info btn-sm btn-circle" title="Detail" onclick='showDetail(@json($item))'>
                                 <i class="fas fa-eye"></i>
                             </button>
-                            <a href="{{ route('peramalan_tes.export_pdf', $item->id) }}" class="btn btn-warning btn-sm btn-circle" title="Export PDF" target="_blank">
+                            <button class="btn btn-warning btn-sm btn-circle" title="Pembanding" onclick="showComparison({{ $item->id }})">
+                                <i class="fas fa-chart-line"></i>
+                            </button>
+                            <a href="{{ route('peramalan_tes.export_pdf', $item->id) }}" class="btn btn-secondary btn-sm btn-circle" title="Export PDF" target="_blank">
                                 <i class="fas fa-file-pdf"></i>
                             </a>
                             <form action="{{ route('peramalan_tes.destroy', $item->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Hapus riwayat ini?')">
@@ -204,6 +205,9 @@
         </div>
     </div>
 </div>
+
+<!-- Container untuk Card Perbandingan (muncul di bawah tabel) -->
+<div id="dynamicCardContainer"></div>
 
 <!-- Detail Modal -->
 <div class="modal fade" id="detailModal" tabindex="-1" role="dialog" aria-labelledby="detailModalLabel" aria-hidden="true">
@@ -225,7 +229,6 @@
                     <div><strong>Metode:</strong> TES</div>
                 </div>
 
-                <!-- Detailed Table -->
                 <div class="table-responsive mb-4">
                     <table class="table table-bordered table-striped" width="100%" cellspacing="0">
                         <thead>
@@ -239,28 +242,21 @@
                                 <th>Error</th>
                             </tr>
                         </thead>
-                        <tbody id="detail_table_body">
-                            <!-- Data populated by JS -->
-                        </tbody>
+                        <tbody id="detail_table_body"></tbody>
                     </table>
                 </div>
 
-                 <div class="row">
-                    <!-- Chart -->
+                <div class="row">
                     <div class="col-lg-8">
-                         <div class="chart-area">
+                        <div class="chart-area">
                             <canvas id="detailChart"></canvas>
                         </div>
                     </div>
-                    <!-- Metrics -->
                     <div class="col-lg-4">
                         <div class="table-responsive">
                             <table class="table table-bordered table-sm">
                                 <thead class="thead-light">
-                                    <tr>
-                                        <th>Metric</th>
-                                        <th>Value</th>
-                                    </tr>
+                                    <tr><th>Metric</th><th>Value</th></tr>
                                 </thead>
                                 <tbody>
                                     <tr><td>MAD</td><td id="detail_mad"></td></tr>
@@ -271,7 +267,6 @@
                         </div>
                     </div>
                 </div>
-
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Tutup</button>
@@ -289,29 +284,25 @@
     });
 
     var detailChartInstance = null;
+    var currentChart = null;
 
     function showDetail(item) {
-        // Set basic info
         $('#detail_kendaraan').text(item.kendaraan ? item.kendaraan.nama_kendaraan : '-');
-        $('#detail_alpha').text(item.alpha);
+        $('#detail_alpha').text(item.alfa);
         $('#detail_beta').text(item.beta);
         $('#detail_gamma').text(item.gamma);
         $('#detail_mad').text(item.mad);
         $('#detail_mse').text(item.mse);
         $('#detail_mape').text(item.mape + '%');
-        $('#detail_durasi').text(item.durasi_prediksi);
+        $('#detail_durasi').text(item.durasi_prediksi ?? '-');
 
-        // Populate table & Prepare chart arrays
         var tbody = $('#detail_table_body');
         tbody.empty();
 
-        var labels = [];
-        var actuals = [];
-        var predicteds = [];
+        var labels = [], actuals = [], predicteds = [];
 
         if (item.data_peramalan && item.data_peramalan.length > 0) {
             item.data_peramalan.forEach(function(row) {
-                // Assuming similar structure but with extra TES fields
                 var tr = `
                     <tr>
                         <td>${row.bulan_tahun || '-'}</td>
@@ -321,11 +312,8 @@
                         <td>${row.seasonal || '-'}</td>
                         <td>${row.prediksi || '-'}</td>
                         <td>${row.error || '-'}</td>
-                    </tr>
-                `;
+                    </tr>`;
                 tbody.append(tr);
-
-                // Chart data
                 labels.push(row.bulan_tahun);
                 actuals.push(row.aktual !== '-' ? row.aktual : null);
                 predicteds.push(row.prediksi !== '-' ? row.prediksi : null);
@@ -336,10 +324,7 @@
 
         $('#detailModal').modal('show');
 
-        // Render Chart
-        if(detailChartInstance) {
-            detailChartInstance.destroy();
-        }
+        if (detailChartInstance) detailChartInstance.destroy();
 
         var ctx = document.getElementById("detailChart");
         detailChartInstance = new Chart(ctx, {
@@ -355,13 +340,10 @@
                     pointBackgroundColor: "rgba(78, 115, 223, 1)",
                     pointBorderColor: "rgba(78, 115, 223, 1)",
                     pointHoverRadius: 3,
-                    pointHoverBackgroundColor: "rgba(78, 115, 223, 1)",
-                    pointHoverBorderColor: "rgba(78, 115, 223, 1)",
                     pointHitRadius: 10,
                     pointBorderWidth: 2,
                     data: actuals,
-                },
-                {
+                }, {
                     label: "Prediksi",
                     lineTension: 0.3,
                     backgroundColor: "rgba(28, 200, 138, 0.05)",
@@ -370,8 +352,6 @@
                     pointBackgroundColor: "rgba(28, 200, 138, 1)",
                     pointBorderColor: "rgba(28, 200, 138, 1)",
                     pointHoverRadius: 3,
-                    pointHoverBackgroundColor: "rgba(28, 200, 138, 1)",
-                    pointHoverBorderColor: "rgba(28, 200, 138, 1)",
                     pointHitRadius: 10,
                     pointBorderWidth: 2,
                     data: predicteds,
@@ -381,19 +361,131 @@
                 maintainAspectRatio: false,
                 layout: { padding: { left: 10, right: 25, top: 25, bottom: 0 } },
                 scales: {
-                    xAxes: [{ time: { unit: 'date' }, gridLines: { display: false, drawBorder: false }, ticks: { maxTicksLimit: 7 } }],
+                    xAxes: [{ gridLines: { display: false, drawBorder: false }, ticks: { maxTicksLimit: 7 } }],
                     yAxes: [{ ticks: { maxTicksLimit: 5, padding: 10 }, gridLines: { color: "rgb(234, 236, 244)", zeroLineColor: "rgb(234, 236, 244)", drawBorder: false, borderDash: [2], zeroLineBorderDash: [2] } }],
                 },
                 legend: { display: true },
                 tooltips: {
-                    backgroundColor: "rgb(255,255,255)", bodyFontColor: "#858796", titleMarginBottom: 10, titleFontColor: '#6e707e', titleFontSize: 14, borderColor: '#dddfeb', borderWidth: 1, xPadding: 15, yPadding: 15, displayColors: false, intersect: false, mode: 'index', caretPadding: 10
+                    backgroundColor: "rgb(255,255,255)", bodyFontColor: "#858796", titleMarginBottom: 10,
+                    titleFontColor: '#6e707e', titleFontSize: 14, borderColor: '#dddfeb', borderWidth: 1,
+                    xPadding: 15, yPadding: 15, displayColors: false, intersect: false, mode: 'index', caretPadding: 10
                 }
             }
         });
     }
 
+    function showComparison(id) {
+        $.ajax({
+            url: '/perbandingan/' + id + '/compare',
+            type: 'GET',
+            success: function(response) {
+                renderComparisonCard(response);
+            },
+            error: function(err) {
+                alert('Gagal mengambil data perbandingan.');
+                console.error(err);
+            }
+        });
+    }
+
+    function renderComparisonCard(data) {
+        var html = `
+        <div class="card shadow mb-4" id="comparisonCard">
+            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                <h6 class="m-0 font-weight-bold text-primary">Perbandingan TES vs SMA</h6>
+                <button type="button" class="close" onclick="$('#comparisonCard').remove(); if(currentChart){ currentChart.destroy(); currentChart = null; }" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="card-body">
+                <div class="chart-area mb-4">
+                    <canvas id="compChartCanvas"></canvas>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-bordered text-center">
+                        <thead class="thead-light">
+                            <tr>
+                                <th>Metode</th>
+                                <th>MAD</th>
+                                <th>MSE</th>
+                                <th>MAPE</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>TES</td>
+                                <td>${data.accuracy.tes.mad}</td>
+                                <td>${data.accuracy.tes.mse}</td>
+                                <td>${data.accuracy.tes.mape}%</td>
+                            </tr>
+                            <tr>
+                                <td>SMA</td>
+                                <td>${data.accuracy.sma.mad}</td>
+                                <td>${data.accuracy.sma.mse}</td>
+                                <td>${data.accuracy.sma.mape}%</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="alert alert-info text-center mt-3">
+                    ${data.conclusion}
+                </div>
+            </div>
+        </div>`;
+
+        $('#dynamicCardContainer').html(html);
+
+        var ctx = document.getElementById("compChartCanvas");
+        if (currentChart) currentChart.destroy();
+
+        currentChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: data.chart.labels,
+                datasets: [
+                    {
+                        label: "Aktual",
+                        lineTension: 0.3,
+                        borderColor: "rgba(78, 115, 223, 1)",
+                        pointRadius: 3,
+                        pointBackgroundColor: "rgba(78, 115, 223, 1)",
+                        data: data.chart.actual,
+                        fill: false
+                    },
+                    {
+                        label: "TES",
+                        lineTension: 0.3,
+                        borderColor: "rgba(246, 194, 62, 1)",
+                        pointRadius: 3,
+                        pointBackgroundColor: "rgba(246, 194, 62, 1)",
+                        data: data.chart.tes,
+                        fill: false,
+                        borderDash: [5, 5]
+                    },
+                    {
+                        label: "SMA",
+                        lineTension: 0.3,
+                        borderColor: "rgba(28, 200, 138, 1)",
+                        pointRadius: 3,
+                        pointBackgroundColor: "rgba(28, 200, 138, 1)",
+                        data: data.chart.sma,
+                        fill: false,
+                        borderDash: [5, 5]
+                    }
+                ]
+            },
+            options: {
+                maintainAspectRatio: false,
+                tooltips: { mode: 'index', intersect: false }
+            }
+        });
+
+        $('html, body').animate({
+            scrollTop: $("#dynamicCardContainer").offset().top - 100
+        }, 500);
+    }
+
     @if(isset($showResult) && $showResult)
-    // TES Chart (Main Page)
     var ctx = document.getElementById("tesChart");
     var myLineChart = new Chart(ctx, {
         type: 'line',
@@ -413,8 +505,7 @@
                 pointHitRadius: 10,
                 pointBorderWidth: 2,
                 data: @json($actualData),
-            },
-            {
+            }, {
                 label: "Prediksi",
                 lineTension: 0.3,
                 backgroundColor: "rgba(28, 200, 138, 0.05)",
@@ -432,62 +523,16 @@
         },
         options: {
             maintainAspectRatio: false,
-            layout: {
-                padding: {
-                    left: 10,
-                    right: 25,
-                    top: 25,
-                    bottom: 0
-                }
-            },
+            layout: { padding: { left: 10, right: 25, top: 25, bottom: 0 } },
             scales: {
-                xAxes: [{
-                    time: {
-                        unit: 'date'
-                    },
-                    gridLines: {
-                        display: false,
-                        drawBorder: false
-                    },
-                    ticks: {
-                        maxTicksLimit: 7
-                    }
-                }],
-                yAxes: [{
-                    ticks: {
-                        maxTicksLimit: 5,
-                        padding: 10,
-                        // Include a dollar sign in the ticks
-                        callback: function(value, index, values) {
-                            return  number_format(value);
-                        }
-                    },
-                    gridLines: {
-                        color: "rgb(234, 236, 244)",
-                        zeroLineColor: "rgb(234, 236, 244)",
-                        drawBorder: false,
-                        borderDash: [2],
-                        zeroLineBorderDash: [2]
-                    }
-                }],
+                xAxes: [{ gridLines: { display: false, drawBorder: false }, ticks: { maxTicksLimit: 7 } }],
+                yAxes: [{ ticks: { maxTicksLimit: 5, padding: 10, callback: function(value) { return number_format(value); } }, gridLines: { color: "rgb(234, 236, 244)", zeroLineColor: "rgb(234, 236, 244)", drawBorder: false, borderDash: [2], zeroLineBorderDash: [2] } }],
             },
-            legend: {
-                display: true
-            },
+            legend: { display: true },
             tooltips: {
-                backgroundColor: "rgb(255,255,255)",
-                bodyFontColor: "#858796",
-                titleMarginBottom: 10,
-                titleFontColor: '#6e707e',
-                titleFontSize: 14,
-                borderColor: '#dddfeb',
-                borderWidth: 1,
-                xPadding: 15,
-                yPadding: 15,
-                displayColors: false,
-                intersect: false,
-                mode: 'index',
-                caretPadding: 10,
+                backgroundColor: "rgb(255,255,255)", bodyFontColor: "#858796", titleMarginBottom: 10,
+                titleFontColor: '#6e707e', titleFontSize: 14, borderColor: '#dddfeb', borderWidth: 1,
+                xPadding: 15, yPadding: 15, displayColors: false, intersect: false, mode: 'index', caretPadding: 10,
                 callbacks: {
                     label: function(tooltipItem, chart) {
                         var datasetLabel = chart.datasets[tooltipItem.datasetIndex].label || '';
