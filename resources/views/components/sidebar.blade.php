@@ -1,15 +1,13 @@
-<ul class="navbar-nav sidebar sidebar-dark accordion" id="accordionSidebar">
+<ul class="navbar-nav sidebar accordion" id="accordionSidebar">
 
-    <!-- Sidebar Header -->
-    <div class="sidebar-header">
-        <img src="{{ url('/template/img/logorental.png') }}"
-             alt="Logo MSJ Trans"
-             class="sidebar-logo">
+    <!-- Logo -->
+    <div class="sidebar-brand-area">
+        <img src="{{ url('/template/img/logorental.png') }}" alt="MSJ Trans">
     </div>
 
-    <hr class="sidebar-divider my-0">
-
     <!-- Dashboard -->
+    <div class="sidebar-section-label">Main</div>
+
     <li class="nav-item {{ Request::is('/') ? 'active' : '' }}">
         <a class="nav-link" href="{{ url('/') }}">
             <i class="fas fa-fw fa-tachometer-alt"></i>
@@ -19,16 +17,14 @@
 
     <hr class="sidebar-divider">
 
-    <div class="sidebar-heading">Management</div>
+    <!-- Management -->
+    <div class="sidebar-section-label">Management</div>
 
-    <!-- Management Collapse -->
     <li class="nav-item {{ Request::is('management-kendaraan*') || Request::is('input-data*') ? 'active' : '' }}">
-
         <a class="nav-link {{ Request::is('management-kendaraan*') || Request::is('input-data*') ? '' : 'collapsed' }}"
            href="#"
            data-toggle="collapse"
            data-target="#collapseManagement">
-
             <i class="fas fa-fw fa-folder"></i>
             <span>Management Data</span>
         </a>
@@ -36,18 +32,14 @@
         <div id="collapseManagement"
              class="collapse {{ Request::is('management-kendaraan*') || Request::is('input-data*') ? 'show' : '' }}"
              data-parent="#accordionSidebar">
-
             <div class="collapse-inner">
                 <a class="collapse-item {{ Request::is('management-kendaraan*') ? 'active' : '' }}"
                    href="{{ url('/management-kendaraan') }}">
-                    <i class="fas fa-fw fa-car mr-2"></i>
-                    Daftar Kendaraan
+                    <i class="fas fa-fw fa-car"></i> Daftar Kendaraan
                 </a>
-
                 <a class="collapse-item {{ Request::is('input-data*') ? 'active' : '' }}"
                    href="{{ url('/input-data') }}">
-                    <i class="fas fa-fw fa-list mr-2"></i>
-                    Daftar Transaksi
+                    <i class="fas fa-fw fa-list"></i> Daftar Transaksi
                 </a>
             </div>
         </div>
@@ -55,28 +47,25 @@
 
     <hr class="sidebar-divider">
 
-    <div class="sidebar-heading">Peramalan</div>
-
     <!-- Peramalan -->
-    <li class="nav-item {{ Request::is('peramalan-smp*') || Request::is('peramalan-tes*') ? 'active' : '' }}">
+    <div class="sidebar-section-label">Peramalan</div>
 
-        <a class="nav-link collapsed"
+    <li class="nav-item {{ Request::is('peramalan-tes*') ? 'active' : '' }}">
+        <a class="nav-link {{ Request::is('peramalan-tes*') ? '' : 'collapsed' }}"
            href="#"
            data-toggle="collapse"
            data-target="#collapsePeramalan">
-
             <i class="fas fa-fw fa-chart-line"></i>
             <span>Metode Peramalan</span>
         </a>
 
         <div id="collapsePeramalan"
-             class="collapse {{ Request::is('peramalan-smp*') || Request::is('peramalan-tes*') ? 'show' : '' }}"
+             class="collapse {{ Request::is('peramalan-tes*') ? 'show' : '' }}"
              data-parent="#accordionSidebar">
-
             <div class="collapse-inner">
                 <a class="collapse-item {{ Request::is('peramalan-tes*') ? 'active' : '' }}"
                    href="{{ url('/peramalan-tes') }}">
-                    Triple Exponential Smoothing
+                    <i class="fas fa-fw fa-wave-square"></i> Triple Exp. Smoothing
                 </a>
             </div>
         </div>
@@ -84,7 +73,8 @@
 
     <hr class="sidebar-divider">
 
-    <div class="sidebar-heading">Hasil</div>
+    <!-- Hasil -->
+    <div class="sidebar-section-label">Hasil</div>
 
     <li class="nav-item {{ Request::is('analisis-armada*') ? 'active' : '' }}">
         <a class="nav-link" href="{{ url('/analisis-armada') }}">

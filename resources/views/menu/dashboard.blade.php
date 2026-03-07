@@ -2,450 +2,289 @@
 
 @section('content')
 
-    <!-- Page Heading -->
-    <div class="d-sm-flex align-items-center justify-content-between mb-4">
-        <h1 class="h3 mb-0 text-gray-800">Dashboard</h1>
-    </div>
+<style>
+    :root {
+        --msj-red:       #74271f;
+        --msj-red-light: #be4132;
+        --msj-dark:      #2d2d2d;
+    }
 
-    <!-- Content Row -->
-    <div class="row">
+    /* ===== PAGE HEADING ===== */
+    .dashboard-heading {
+        border-left: 4px solid var(--msj-red);
+        padding-left: 12px;
+        margin-bottom: 24px;
+    }
+    .dashboard-heading h1 {
+        font-size: 1.4rem;
+        font-weight: 700;
+        color: var(--msj-dark);
+        margin: 0;
+    }
+    .dashboard-heading small {
+        font-size: 0.78rem;
+        color: #888;
+    }
 
-        <!-- Jumlah Kendaraan Card -->
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-primary shadow h-100 py-2">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
-                                Jumlah Kendaraan</div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ $countKendaraan }}</div>
-                        </div>
-                        <div class="col-auto">
-                            <i class="fas fa-car fa-2x text-gray-300"></i>
-                        </div>
-                    </div>
-                </div>
+    /* ===== STAT CARDS ===== */
+    .stat-card {
+        border: none;
+        border-radius: 14px;
+        padding: 22px 26px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        color: #fff;
+        box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+        transition: transform 0.25s ease, box-shadow 0.25s ease;
+        overflow: hidden;
+        position: relative;
+    }
+    .stat-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 28px rgba(0,0,0,0.18);
+    }
+    .stat-card .stat-info .stat-label {
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        opacity: 0.85;
+        margin-bottom: 6px;
+    }
+    .stat-card .stat-info .stat-value {
+        font-size: 2.1rem;
+        font-weight: 800;
+        line-height: 1;
+    }
+    .stat-card .stat-icon {
+        font-size: 3rem;
+        opacity: 0.22;
+    }
+    .stat-card::after {
+        content: '';
+        position: absolute;
+        width: 130px; height: 130px;
+        border-radius: 50%;
+        background: rgba(255,255,255,0.08);
+        right: -35px; top: -35px;
+    }
+
+    .card-kendaraan { background: linear-gradient(135deg, #74271f, #be4132); }
+    .card-transaksi { background: linear-gradient(135deg, #1a6b3c, #28a86a); }
+    .card-tes       { background: linear-gradient(135deg, #b07d10, #f0a500); }
+
+    /* ===== CHART CARDS ===== */
+    .chart-card {
+        border: none;
+        border-radius: 14px;
+        box-shadow: 0 4px 18px rgba(0,0,0,0.08);
+        overflow: hidden;
+    }
+    .chart-card .chart-card-header {
+        padding: 16px 20px;
+        border-bottom: 1px solid #f0f0f0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: #fff;
+    }
+    .chart-card .chart-card-header h6 {
+        margin: 0;
+        font-weight: 700;
+        font-size: 0.88rem;
+        color: var(--msj-dark);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .chart-card .chart-card-header h6::before {
+        content: '';
+        display: inline-block;
+        width: 4px; height: 16px;
+        background: var(--msj-red);
+        border-radius: 2px;
+    }
+    .chart-card .card-body {
+        padding: 20px;
+        background: #fff;
+    }
+</style>
+
+
+<!-- ===== STAT CARDS (3 card, col-4 each) ===== -->
+<div class="row mb-2">
+
+    <div class="col-xl-4 col-md-6 mb-4">
+        <div class="stat-card card-kendaraan">
+            <div class="stat-info">
+                <div class="stat-label">Jumlah Kendaraan</div>
+                <div class="stat-value">{{ $countKendaraan }}</div>
+                <small style="opacity:.75;font-size:.72rem;">Unit terdaftar</small>
             </div>
-        </div>
-
-        <!-- Total Transaksi Card -->
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-success shadow h-100 py-2">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
-                                Total Transaksi</div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ number_format($totalTransaksi, 0, ',', '.') }}</div>
-                        </div>
-                        <div class="col-auto">
-                            <i class="fas fa-dollar-sign fa-2x text-gray-300"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Peramalan SMA Card -->
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-info shadow h-100 py-2">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Data Peramalan SMA
-                            </div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ $countSma }}</div>
-                        </div>
-                        <div class="col-auto">
-                            <i class="fas fa-chart-line fa-2x text-gray-300"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Peramalan TES Card -->
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-warning shadow h-100 py-2">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
-                                Data Peramalan TES</div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ $countTes }}</div>
-                        </div>
-                        <div class="col-auto">
-                            <i class="fas fa-chart-area fa-2x text-gray-300"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Content Row -->
-
-    <div class="row">
-
-        <!-- Area Chart -->
-        <div class="col-xl-8 col-lg-7">
-            <div class="card shadow mb-4">
-                <!-- Card Header - Dropdown -->
-                <div
-                    class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
-                    <h6 class="m-0 font-weight-bold text-primary">Data Aktual: {{ $vehicleName }}</h6>
-                    <div class="dropdown no-arrow">
-                        <a class="dropdown-toggle" href="#" role="button" id="dropdownMenuLink"
-                            data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                            <i class="fas fa-ellipsis-v fa-sm fa-fw text-gray-400"></i>
-                        </a>
-                        <div class="dropdown-menu dropdown-menu-right shadow animated--fade-in"
-                            aria-labelledby="dropdownMenuLink">
-                            <div class="dropdown-header">Pilih Kendaraan:</div>
-                            @foreach($vehicles as $v)
-                                <a class="dropdown-item" href="{{ url('/?vehicle_id=' . $v->id) }}">
-                                    {{ $v->merk }} {{ $v->nama_kendaraan }}
-                                </a>
-                            @endforeach
-                        </div>
-                    </div>
-                </div>
-                <!-- Card Body -->
-                <div class="card-body">
-                    <div class="chart-area">
-                        <canvas id="myAreaChart"></canvas>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Pie Chart -->
-        <div class="col-xl-4 col-lg-5">
-            <div class="card shadow mb-4">
-                <!-- Card Header - Dropdown -->
-                <div
-                    class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
-                    <h6 class="m-0 font-weight-bold text-primary">Transaksi per Kendaraan</h6>
-                </div>
-                <!-- Card Body -->
-                <div class="card-body">
-                    <div class="chart-pie pt-4 pb-2">
-                        <canvas id="myPieChart"></canvas>
-                    </div>
-                    <div class="mt-4 text-center small">
-                       {{-- Legend generated by JS --}}
-                       <span class="mr-2">Distribusi Transaksi</span>
-                    </div>
-                </div>
-            </div>
+            <i class="fas fa-car stat-icon"></i>
         </div>
     </div>
 
-    @push('scripts')
-    <script>
-        // Set new default font family and font color to mimic Bootstrap's default styling
-        Chart.defaults.global.defaultFontFamily = 'Nunito', '-apple-system,system-ui,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif';
-        Chart.defaults.global.defaultFontColor = '#858796';
+    <div class="col-xl-4 col-md-6 mb-4">
+        <div class="stat-card card-transaksi">
+            <div class="stat-info">
+                <div class="stat-label">Total Transaksi</div>
+                <div class="stat-value">{{ number_format($totalTransaksi, 0, ',', '.') }}</div>
+                <small style="opacity:.75;font-size:.72rem;">Pemakaian kendaraan</small>
+            </div>
+            <i class="fas fa-exchange-alt stat-icon"></i>
+        </div>
+    </div>
 
-        function number_format(number, decimals, dec_point, thousands_sep) {
-          // *     example: number_format(1234.56, 2, ',', ' ');
-          // *     return: '1 234,56'
-          number = (number + '').replace(',', '').replace(' ', '');
-          var n = !isFinite(+number) ? 0 : +number,
+    <div class="col-xl-4 col-md-6 mb-4">
+        <div class="stat-card card-tes">
+            <div class="stat-info">
+                <div class="stat-label">Data Peramalan TES</div>
+                <div class="stat-value">{{ $countTes }}</div>
+                <small style="opacity:.75;font-size:.72rem;">Triple Exp. Smoothing</small>
+            </div>
+            <i class="fas fa-chart-area stat-icon"></i>
+        </div>
+    </div>
+
+</div>
+
+<!-- ===== CHARTS ROW ===== -->
+<div class="row">
+
+    <div class="col-xl-8 col-lg-7 mb-4">
+        <div class="chart-card">
+            <div class="chart-card-header">
+                <h6>Data Aktual: {{ $vehicleName }}</h6>
+                <div class="dropdown no-arrow">
+                    <a class="btn btn-sm btn-outline-secondary dropdown-toggle" href="#"
+                        role="button" id="dropdownMenuLink"
+                        data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        <i class="fas fa-car fa-sm mr-1"></i> Ganti Kendaraan
+                    </a>
+                    <div class="dropdown-menu dropdown-menu-right shadow animated--fade-in"
+                        aria-labelledby="dropdownMenuLink">
+                        <div class="dropdown-header" style="font-size:.75rem;color:#888;">Pilih Kendaraan:</div>
+                        @foreach($vehicles as $v)
+                            <a class="dropdown-item" href="{{ url('/?vehicle_id=' . $v->id) }}">
+                                <i class="fas fa-car fa-sm mr-2 text-muted"></i>
+                                {{ trim($v->merk . ' ' . $v->nama_kendaraan) }}
+                            </a>
+                        @endforeach
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="chart-area">
+                    <canvas id="myAreaChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-4 col-lg-5 mb-4">
+        <div class="chart-card h-100">
+            <div class="chart-card-header">
+                <h6>Transaksi per Kendaraan</h6>
+            </div>
+            <div class="card-body d-flex flex-column align-items-center justify-content-center">
+                <div class="chart-pie pt-2 pb-2" style="width:100%;">
+                    <canvas id="myPieChart"></canvas>
+                </div>
+                <div class="mt-3 text-center">
+                    <small class="text-muted">Distribusi Transaksi Seluruh Kendaraan</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+@push('scripts')
+<script>
+    Chart.defaults.global.defaultFontFamily = 'Nunito, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
+    Chart.defaults.global.defaultFontColor = '#858796';
+
+    function number_format(number, decimals, dec_point, thousands_sep) {
+        number = (number + '').replace(',', '').replace(' ', '');
+        var n = !isFinite(+number) ? 0 : +number,
             prec = !isFinite(+decimals) ? 0 : Math.abs(decimals),
             sep = (typeof thousands_sep === 'undefined') ? ',' : thousands_sep,
             dec = (typeof dec_point === 'undefined') ? '.' : dec_point,
             s = '',
-            toFixedFix = function(n, prec) {
-              var k = Math.pow(10, prec);
-              return '' + Math.round(n * k) / k;
-            };
-          s = (prec ? toFixedFix(n, prec) : '' + Math.round(n)).split('.');
-          if (s[0].length > 3) {
-            s[0] = s[0].replace(/\B(?=(?:\d{3})+(?!\d))/g, sep);
-          }
-          if ((s[1] || '').length < prec) {
-            s[1] = s[1] || '';
-            s[1] += new Array(prec - s[1].length + 1).join('0');
-          }
-          return s.join(dec);
-        }
+            toFixedFix = function(n, prec) { var k = Math.pow(10, prec); return '' + Math.round(n * k) / k; };
+        s = (prec ? toFixedFix(n, prec) : '' + Math.round(n)).split('.');
+        if (s[0].length > 3) s[0] = s[0].replace(/\B(?=(?:\d{3})+(?!\d))/g, sep);
+        if ((s[1] || '').length < prec) { s[1] = s[1] || ''; s[1] += new Array(prec - s[1].length + 1).join('0'); }
+        return s.join(dec);
+    }
 
-        // Area Chart (Data Aktual)
-        var ctx = document.getElementById("myAreaChart");
-        var myLineChart = new Chart(ctx, {
-          type: 'line',
-          data: {
+    // LINE CHART
+    var ctx = document.getElementById("myAreaChart");
+    var myLineChart = new Chart(ctx, {
+        type: 'line',
+        data: {
             labels: {!! json_encode($lineLabels) !!},
             datasets: [{
-              label: "Transaksi",
-              lineTension: 0.3,
-              backgroundColor: "rgba(190, 65, 50, 0.05)",
-              borderColor: "#BE4132",
-              pointRadius: 3,
-              pointBackgroundColor: "#BE4132",
-              pointBorderColor: "#BE4132",
-              pointHoverRadius: 3,
-              pointHoverBackgroundColor: "#BE4132",
-              pointHoverBorderColor: "#BE4132",
-              pointHitRadius: 10,
-              pointBorderWidth: 2,
-              data: {!! json_encode($lineData) !!},
+                label: "Transaksi",
+                lineTension: 0.3,
+                backgroundColor: "rgba(190, 65, 50, 0.07)",
+                borderColor: "#BE4132",
+                borderWidth: 2,
+                pointRadius: 3,
+                pointBackgroundColor: "#BE4132",
+                pointBorderColor: "#fff",
+                pointBorderWidth: 2,
+                pointHoverRadius: 5,
+                pointHoverBackgroundColor: "#BE4132",
+                pointHoverBorderColor: "#fff",
+                pointHitRadius: 10,
+                data: {!! json_encode($lineData) !!},
             }],
-          },
-          options: {
+        },
+        options: {
             maintainAspectRatio: false,
-            layout: {
-              padding: {
-                left: 10,
-                right: 25,
-                top: 25,
-                bottom: 0
-              }
-            },
+            layout: { padding: { left: 10, right: 25, top: 25, bottom: 0 } },
             scales: {
-              xAxes: [{
-                time: {
-                  unit: 'date'
-                },
-                gridLines: {
-                  display: false,
-                  drawBorder: false
-                },
-                ticks: {
-                  maxTicksLimit: 7
-                }
-              }],
-              yAxes: [{
-                ticks: {
-                  maxTicksLimit: 5,
-                  padding: 10,
-                  // Include a dollar sign in the ticks
-                  callback: function(value, index, values) {
-                    return number_format(value);
-                  }
-                },
-                gridLines: {
-                  color: "rgb(234, 236, 244)",
-                  zeroLineColor: "rgb(234, 236, 244)",
-                  drawBorder: false,
-                  borderDash: [2],
-                  zeroLineBorderDash: [2]
-                }
-              }],
+                xAxes: [{ gridLines: { display: false, drawBorder: false }, ticks: { maxTicksLimit: 7, fontSize: 11 } }],
+                yAxes: [{
+                    ticks: { maxTicksLimit: 5, padding: 10, fontSize: 11, callback: function(value) { return number_format(value); } },
+                    gridLines: { color: "rgb(234, 236, 244)", zeroLineColor: "rgb(234, 236, 244)", drawBorder: false, borderDash: [2], zeroLineBorderDash: [2] }
+                }],
             },
-            legend: {
-              display: false
-            },
+            legend: { display: false },
             tooltips: {
-              backgroundColor: "rgb(255,255,255)",
-              bodyFontColor: "#858796",
-              titleMarginBottom: 10,
-              titleFontColor: '#6e707e',
-              titleFontSize: 14,
-              borderColor: '#dddfeb',
-              borderWidth: 1,
-              xPadding: 15,
-              yPadding: 15,
-              displayColors: false,
-              intersect: false,
-              mode: 'index',
-              caretPadding: 10,
-              callbacks: {
-                label: function(tooltipItem, chart) {
-                  var datasetLabel = chart.datasets[tooltipItem.datasetIndex].label || '';
-                  return datasetLabel + ': ' + number_format(tooltipItem.yLabel);
-                }
-              }
+                backgroundColor: "#fff", bodyFontColor: "#858796", titleFontColor: '#6e707e',
+                titleFontSize: 13, borderColor: '#dddfeb', borderWidth: 1,
+                xPadding: 15, yPadding: 15, displayColors: false, intersect: false, mode: 'index', caretPadding: 10,
+                callbacks: { label: function(tooltipItem, chart) { var datasetLabel = chart.datasets[tooltipItem.datasetIndex].label || ''; return datasetLabel + ': ' + number_format(tooltipItem.yLabel); } }
             }
-          }
-        });
+        }
+    });
 
-        // Pie Chart (Donut)
-        var ctxPie = document.getElementById("myPieChart");
-        var myPieChart = new Chart(ctxPie, {
-          type: 'doughnut',
-          data: {
+    // DONUT CHART
+    var ctxPie = document.getElementById("myPieChart");
+    var myPieChart = new Chart(ctxPie, {
+        type: 'doughnut',
+        data: {
             labels: {!! json_encode($donutLabels) !!},
             datasets: [{
-              data: {!! json_encode($donutData) !!},
-              backgroundColor: ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b', '#858796', '#5a5c69'],
-              hoverBackgroundColor: ['#2e59d9', '#17a673', '#2c9faf', '#dda20a','#be2617', '#60616f', '#373840'],
-              hoverBorderColor: "rgba(234, 236, 244, 1)",
+                data: {!! json_encode($donutData) !!},
+                backgroundColor: ['#74271f', '#28a86a', '#36b9cc', '#f0a500', '#2e7fd8', '#858796', '#5a5c69'],
+                hoverBackgroundColor: ['#be4132', '#1a8a56', '#2c9faf', '#c88800', '#1a5fa8', '#60616f', '#373840'],
+                hoverBorderColor: "rgba(234, 236, 244, 1)",
+                borderWidth: 3,
             }],
-          },
-          options: {
+        },
+        options: {
             maintainAspectRatio: false,
-            tooltips: {
-              backgroundColor: "rgb(255,255,255)",
-              bodyFontColor: "#858796",
-              borderColor: '#dddfeb',
-              borderWidth: 1,
-              xPadding: 15,
-              yPadding: 15,
-              displayColors: true,
-              caretPadding: 10,
-            },
-            legend: {
-              display: true,
-              position: 'bottom'
-            },
-            cutoutPercentage: 80,
-          },
-        });
-    </script>
-    @endpush
+            tooltips: { backgroundColor: "#fff", bodyFontColor: "#858796", borderColor: '#dddfeb', borderWidth: 1, xPadding: 15, yPadding: 15, displayColors: true, caretPadding: 10 },
+            legend: { display: true, position: 'bottom', labels: { padding: 16, fontSize: 12, usePointStyle: true } },
+            cutoutPercentage: 75,
+        },
+    });
+</script>
+@endpush
 
-    <!-- Content Row -->
-    {{-- <div class="row">
-
-        <!-- Content Column -->
-        <div class="col-lg-6 mb-4">
-
-            <!-- Project Card Example -->
-            <div class="card shadow mb-4">
-                <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-primary">Projects</h6>
-                </div>
-                <div class="card-body">
-                    <h4 class="small font-weight-bold">Server Migration <span
-                            class="float-right">20%</span></h4>
-                    <div class="progress mb-4">
-                        <div class="progress-bar bg-danger" role="progressbar" style="width: 20%"
-                            aria-valuenow="20" aria-valuemin="0" aria-valuemax="100"></div>
-                    </div>
-                    <h4 class="small font-weight-bold">Sales Tracking <span
-                            class="float-right">40%</span></h4>
-                    <div class="progress mb-4">
-                        <div class="progress-bar bg-warning" role="progressbar" style="width: 40%"
-                            aria-valuenow="40" aria-valuemin="0" aria-valuemax="100"></div>
-                    </div>
-                    <h4 class="small font-weight-bold">Customer Database <span
-                            class="float-right">60%</span></h4>
-                    <div class="progress mb-4">
-                        <div class="progress-bar" role="progressbar" style="width: 60%"
-                            aria-valuenow="60" aria-valuemin="0" aria-valuemax="100"></div>
-                    </div>
-                    <h4 class="small font-weight-bold">Payout Details <span
-                            class="float-right">80%</span></h4>
-                    <div class="progress mb-4">
-                        <div class="progress-bar bg-info" role="progressbar" style="width: 80%"
-                            aria-valuenow="80" aria-valuemin="0" aria-valuemax="100"></div>
-                    </div>
-                    <h4 class="small font-weight-bold">Account Setup <span
-                            class="float-right">Complete!</span></h4>
-                    <div class="progress">
-                        <div class="progress-bar bg-success" role="progressbar" style="width: 100%"
-                            aria-valuenow="100" aria-valuemin="0" aria-valuemax="100"></div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Color System -->
-            <div class="row">
-                <div class="col-lg-6 mb-4">
-                    <div class="card bg-primary text-white shadow">
-                        <div class="card-body">
-                            Primary
-                            <div class="text-white-50 small">#4e73df</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-lg-6 mb-4">
-                    <div class="card bg-success text-white shadow">
-                        <div class="card-body">
-                            Success
-                            <div class="text-white-50 small">#1cc88a</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-lg-6 mb-4">
-                    <div class="card bg-info text-white shadow">
-                        <div class="card-body">
-                            Info
-                            <div class="text-white-50 small">#36b9cc</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-lg-6 mb-4">
-                    <div class="card bg-warning text-white shadow">
-                        <div class="card-body">
-                            Warning
-                            <div class="text-white-50 small">#f6c23e</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-lg-6 mb-4">
-                    <div class="card bg-danger text-white shadow">
-                        <div class="card-body">
-                            Danger
-                            <div class="text-white-50 small">#e74a3b</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-lg-6 mb-4">
-                    <div class="card bg-secondary text-white shadow">
-                        <div class="card-body">
-                            Secondary
-                            <div class="text-white-50 small">#858796</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-lg-6 mb-4">
-                    <div class="card bg-light text-black shadow">
-                        <div class="card-body">
-                            Light
-                            <div class="text-black-50 small">#f8f9fc</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-lg-6 mb-4">
-                    <div class="card bg-dark text-white shadow">
-                        <div class="card-body">
-                            Dark
-                            <div class="text-white-50 small">#5a5c69</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-        </div>
-
-        <div class="col-lg-6 mb-4">
-
-            <!-- Illustrations -->
-            <div class="card shadow mb-4">
-                <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-primary">Illustrations</h6>
-                </div>
-                <div class="card-body">
-                    <div class="text-center">
-                        <img class="img-fluid px-3 px-sm-4 mt-3 mb-4" style="width: 25rem;"
-                            src="img/undraw_posting_photo.svg" alt="...">
-                    </div>
-                    <p>Add some quality, svg illustrations to your project courtesy of <a
-                            target="_blank" rel="nofollow" href="https://undraw.co/">unDraw</a>, a
-                        constantly updated collection of beautiful svg images that you can use
-                        completely free and without attribution!</p>
-                    <a target="_blank" rel="nofollow" href="https://undraw.co/">Browse Illustrations on
-                        unDraw &rarr;</a>
-                </div>
-            </div>
-
-            <!-- Approach -->
-            <div class="card shadow mb-4">
-                <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-primary">Development Approach</h6>
-                </div>
-                <div class="card-body">
-                    <p>SB Admin 2 makes extensive use of Bootstrap 4 utility classes in order to reduce
-                        CSS bloat and poor page performance. Custom CSS classes are used to create
-                        custom components and custom utility classes.</p>
-                    <p class="mb-0">Before working with this theme, you should become familiar with the
-                        Bootstrap framework, especially the utility classes.</p>
-                </div>
-            </div>
-
-        </div>
-    </div> --}}
 @endsection

@@ -2,11 +2,6 @@
 
 @section('content')
 
-<!-- Page Heading -->
-<div class="d-sm-flex align-items-center justify-content-between mb-4">
-  <h1 class="h3 mb-0 text-gray-800">Peramalan TES (Triple Exponential Smoothing)</h1>
-</div>
-
 @if(session('success'))
 <div class="alert alert-success alert-dismissible fade show" role="alert" id="success-alert">
   {{ session('success') }}
@@ -17,18 +12,12 @@
 <script>
   setTimeout(function() {
     var alert = document.getElementById('success-alert');
-    if (alert) {
-      alert.classList.remove('show');
-      setTimeout(function() {
-        alert.remove();
-      }, 150);
-    }
+    if (alert) { alert.classList.remove('show'); setTimeout(function() { alert.remove(); }, 150); }
   }, 3000);
 </script>
 @endif
 
 <div class="row">
-    <!-- Form Peramalan -->
     <div class="col-xl-12 col-lg-12 mb-4">
         <div class="card shadow h-100">
             <div class="card-header py-3">
@@ -52,6 +41,10 @@
                             <input type="number" class="form-control" id="durasi_prediksi" name="durasi_prediksi" placeholder="Contoh: 12" required>
                         </div>
                     </div>
+                    <small class="form-text text-muted mb-2">
+                        <i class="fas fa-info-circle"></i>
+                        Parameter Alpha, Beta, dan Gamma dicari otomatis
+                    </small>
                     <button type="submit" class="btn btn-primary btn-block">Proses Peramalan</button>
                 </form>
             </div>
@@ -64,13 +57,25 @@
 <div class="row" id="result-card">
     <div class="col-xl-12 col-lg-12 mb-4">
         <div class="card shadow h-100">
-            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+            <div class="card-header py-3">
                 <h6 class="m-0 font-weight-bold text-primary">Hasil Prediksi TES</h6>
             </div>
             <div class="card-body">
+
+                {{-- INFO PARAMETER OPTIMAL --}}
+                <div class="alert alert-success">
+                    <i class="fas fa-search mr-1"></i>
+                    <strong>Parameter Optimal (Grid Search 729 kombinasi):</strong>
+                    &nbsp; Alpha (α) = <strong>{{ $alpha }}</strong>
+                    &nbsp;|&nbsp; Beta (β) = <strong>{{ $beta }}</strong>
+                    &nbsp;|&nbsp; Gamma (γ) = <strong>{{ $gamma }}</strong>
+                    &nbsp; — dipilih berdasarkan MAPE terkecil.
+                </div>
+
+                {{-- TABEL HASIL TES --}}
                 <div class="table-responsive mb-4">
-                    <table class="table table-bordered" width="100%" cellspacing="0">
-                        <thead>
+                    <table class="table table-bordered table-sm" width="100%" cellspacing="0">
+                        <thead class="thead-light">
                             <tr>
                                 <th>Bulan/Tahun</th>
                                 <th>Data Aktual</th>
@@ -82,24 +87,25 @@
                             </tr>
                         </thead>
                         <tbody>
-                             @foreach($resultTable as $row)
-                             <tr>
-                                 <td>{{ $row['bulan_tahun'] }}</td>
-                                 <td>{{ $row['aktual'] }}</td>
-                                 <td>{{ $row['level'] ?? '-' }}</td>
-                                 <td>{{ $row['trend'] ?? '-' }}</td>
-                                 <td>{{ $row['seasonal'] ?? '-' }}</td>
-                                 <td>{{ $row['prediksi'] }}</td>
-                                 <td>{{ $row['error'] }}</td>
-                             </tr>
-                             @endforeach
+                            @foreach($resultTable as $row)
+                            <tr>
+                                <td>{{ $row['bulan_tahun'] }}</td>
+                                <td>{{ $row['aktual'] }}</td>
+                                <td>{{ $row['level'] ?? '-' }}</td>
+                                <td>{{ $row['trend'] ?? '-' }}</td>
+                                <td>{{ $row['seasonal'] ?? '-' }}</td>
+                                <td>{{ $row['prediksi'] }}</td>
+                                <td>{{ $row['error'] }}</td>
+                            </tr>
+                            @endforeach
                         </tbody>
                     </table>
                 </div>
 
+                {{-- GRAFIK + METRIK --}}
                 <div class="row">
                     <div class="col-lg-8">
-                         <div class="chart-area">
+                        <div class="chart-area">
                             <canvas id="tesChart"></canvas>
                         </div>
                     </div>
@@ -140,6 +146,7 @@
                     </form>
                     <a href="{{ url('/peramalan-tes') }}" class="btn btn-secondary">Buang</a>
                 </div>
+
             </div>
         </div>
     </div>
@@ -206,7 +213,7 @@
     </div>
 </div>
 
-<!-- Container untuk Card Perbandingan (muncul di bawah tabel) -->
+<!-- Container untuk Card Perbandingan -->
 <div id="dynamicCardContainer"></div>
 
 <!-- Detail Modal -->
@@ -226,7 +233,7 @@
                     <div class="mr-4"><strong>Beta:</strong> <span id="detail_beta"></span></div>
                     <div class="mr-4"><strong>Gamma:</strong> <span id="detail_gamma"></span></div>
                     <div class="mr-4"><strong>Durasi:</strong> <span id="detail_durasi"></span></div>
-                    <div><strong>Metode:</strong> TES</div>
+                    <div><strong>Metode:</strong> TES (Grid Search)</div>
                 </div>
 
                 <div class="table-responsive mb-4">
@@ -336,24 +343,18 @@
                     lineTension: 0.3,
                     backgroundColor: "rgba(78, 115, 223, 0.05)",
                     borderColor: "rgba(78, 115, 223, 1)",
-                    pointRadius: 3,
-                    pointBackgroundColor: "rgba(78, 115, 223, 1)",
+                    pointRadius: 3, pointBackgroundColor: "rgba(78, 115, 223, 1)",
                     pointBorderColor: "rgba(78, 115, 223, 1)",
-                    pointHoverRadius: 3,
-                    pointHitRadius: 10,
-                    pointBorderWidth: 2,
+                    pointHoverRadius: 3, pointHitRadius: 10, pointBorderWidth: 2,
                     data: actuals,
                 }, {
-                    label: "Prediksi",
+                    label: "Prediksi TES",
                     lineTension: 0.3,
                     backgroundColor: "rgba(28, 200, 138, 0.05)",
                     borderColor: "rgba(28, 200, 138, 1)",
-                    pointRadius: 3,
-                    pointBackgroundColor: "rgba(28, 200, 138, 1)",
+                    pointRadius: 3, pointBackgroundColor: "rgba(28, 200, 138, 1)",
                     pointBorderColor: "rgba(28, 200, 138, 1)",
-                    pointHoverRadius: 3,
-                    pointHitRadius: 10,
-                    pointBorderWidth: 2,
+                    pointHoverRadius: 3, pointHitRadius: 10, pointBorderWidth: 2,
                     data: predicteds,
                 }],
             },
@@ -368,7 +369,7 @@
                 tooltips: {
                     backgroundColor: "rgb(255,255,255)", bodyFontColor: "#858796", titleMarginBottom: 10,
                     titleFontColor: '#6e707e', titleFontSize: 14, borderColor: '#dddfeb', borderWidth: 1,
-                    xPadding: 15, yPadding: 15, displayColors: false, intersect: false, mode: 'index', caretPadding: 10
+                    xPadding: 15, yPadding: 15, displayColors: false, intersect: false, mode: 'index', caretPadding: 10,
                 }
             }
         });
@@ -378,13 +379,8 @@
         $.ajax({
             url: '/perbandingan/' + id + '/compare',
             type: 'GET',
-            success: function(response) {
-                renderComparisonCard(response);
-            },
-            error: function(err) {
-                alert('Gagal mengambil data perbandingan.');
-                console.error(err);
-            }
+            success: function(response) { renderComparisonCard(response); },
+            error: function(err) { alert('Gagal mengambil data perbandingan.'); console.error(err); }
         });
     }
 
@@ -404,22 +400,17 @@
                 <div class="table-responsive">
                     <table class="table table-bordered text-center">
                         <thead class="thead-light">
-                            <tr>
-                                <th>Metode</th>
-                                <th>MAD</th>
-                                <th>MSE</th>
-                                <th>MAPE</th>
-                            </tr>
+                            <tr><th>Metode</th><th>MAD</th><th>MSE</th><th>MAPE</th></tr>
                         </thead>
                         <tbody>
                             <tr>
-                                <td>TES</td>
+                                <td>TES (α=${data.accuracy.tes.alpha}, β=${data.accuracy.tes.beta}, γ=${data.accuracy.tes.gamma})</td>
                                 <td>${data.accuracy.tes.mad}</td>
                                 <td>${data.accuracy.tes.mse}</td>
                                 <td>${data.accuracy.tes.mape}%</td>
                             </tr>
                             <tr>
-                                <td>SMA</td>
+                                <td>SMA (periode 3)</td>
                                 <td>${data.accuracy.sma.mad}</td>
                                 <td>${data.accuracy.sma.mse}</td>
                                 <td>${data.accuracy.sma.mape}%</td>
@@ -427,9 +418,7 @@
                         </tbody>
                     </table>
                 </div>
-                <div class="alert alert-info text-center mt-3">
-                    ${data.conclusion}
-                </div>
+                <div class="alert alert-info text-center mt-3">${data.conclusion}</div>
             </div>
         </div>`;
 
@@ -447,30 +436,22 @@
                         label: "Aktual",
                         lineTension: 0.3,
                         borderColor: "rgba(78, 115, 223, 1)",
-                        pointRadius: 3,
-                        pointBackgroundColor: "rgba(78, 115, 223, 1)",
-                        data: data.chart.actual,
-                        fill: false
+                        pointRadius: 3, pointBackgroundColor: "rgba(78, 115, 223, 1)",
+                        data: data.chart.actual, fill: false
                     },
                     {
                         label: "TES",
                         lineTension: 0.3,
                         borderColor: "rgba(246, 194, 62, 1)",
-                        pointRadius: 3,
-                        pointBackgroundColor: "rgba(246, 194, 62, 1)",
-                        data: data.chart.tes,
-                        fill: false,
-                        borderDash: [5, 5]
+                        pointRadius: 3, pointBackgroundColor: "rgba(246, 194, 62, 1)",
+                        data: data.chart.tes, fill: false, borderDash: [5, 5]
                     },
                     {
                         label: "SMA",
                         lineTension: 0.3,
                         borderColor: "rgba(28, 200, 138, 1)",
-                        pointRadius: 3,
-                        pointBackgroundColor: "rgba(28, 200, 138, 1)",
-                        data: data.chart.sma,
-                        fill: false,
-                        borderDash: [5, 5]
+                        pointRadius: 3, pointBackgroundColor: "rgba(28, 200, 138, 1)",
+                        data: data.chart.sma, fill: false, borderDash: [5, 5]
                     }
                 ]
             },
@@ -480,9 +461,7 @@
             }
         });
 
-        $('html, body').animate({
-            scrollTop: $("#dynamicCardContainer").offset().top - 100
-        }, 500);
+        $('html, body').animate({ scrollTop: $("#dynamicCardContainer").offset().top - 100 }, 500);
     }
 
     @if(isset($showResult) && $showResult)
@@ -496,28 +475,22 @@
                 lineTension: 0.3,
                 backgroundColor: "rgba(78, 115, 223, 0.05)",
                 borderColor: "rgba(78, 115, 223, 1)",
-                pointRadius: 3,
-                pointBackgroundColor: "rgba(78, 115, 223, 1)",
+                pointRadius: 3, pointBackgroundColor: "rgba(78, 115, 223, 1)",
                 pointBorderColor: "rgba(78, 115, 223, 1)",
-                pointHoverRadius: 3,
-                pointHoverBackgroundColor: "rgba(78, 115, 223, 1)",
+                pointHoverRadius: 3, pointHoverBackgroundColor: "rgba(78, 115, 223, 1)",
                 pointHoverBorderColor: "rgba(78, 115, 223, 1)",
-                pointHitRadius: 10,
-                pointBorderWidth: 2,
+                pointHitRadius: 10, pointBorderWidth: 2,
                 data: @json($actualData),
             }, {
-                label: "Prediksi",
+                label: "Prediksi TES",
                 lineTension: 0.3,
                 backgroundColor: "rgba(28, 200, 138, 0.05)",
                 borderColor: "rgba(28, 200, 138, 1)",
-                pointRadius: 3,
-                pointBackgroundColor: "rgba(28, 200, 138, 1)",
+                pointRadius: 3, pointBackgroundColor: "rgba(28, 200, 138, 1)",
                 pointBorderColor: "rgba(28, 200, 138, 1)",
-                pointHoverRadius: 3,
-                pointHoverBackgroundColor: "rgba(28, 200, 138, 1)",
+                pointHoverRadius: 3, pointHoverBackgroundColor: "rgba(28, 200, 138, 1)",
                 pointHoverBorderColor: "rgba(28, 200, 138, 1)",
-                pointHitRadius: 10,
-                pointBorderWidth: 2,
+                pointHitRadius: 10, pointBorderWidth: 2,
                 data: @json($predictedData),
             }],
         },
@@ -526,19 +499,13 @@
             layout: { padding: { left: 10, right: 25, top: 25, bottom: 0 } },
             scales: {
                 xAxes: [{ gridLines: { display: false, drawBorder: false }, ticks: { maxTicksLimit: 7 } }],
-                yAxes: [{ ticks: { maxTicksLimit: 5, padding: 10, callback: function(value) { return number_format(value); } }, gridLines: { color: "rgb(234, 236, 244)", zeroLineColor: "rgb(234, 236, 244)", drawBorder: false, borderDash: [2], zeroLineBorderDash: [2] } }],
+                yAxes: [{ ticks: { maxTicksLimit: 5, padding: 10 }, gridLines: { color: "rgb(234, 236, 244)", zeroLineColor: "rgb(234, 236, 244)", drawBorder: false, borderDash: [2], zeroLineBorderDash: [2] } }],
             },
             legend: { display: true },
             tooltips: {
                 backgroundColor: "rgb(255,255,255)", bodyFontColor: "#858796", titleMarginBottom: 10,
                 titleFontColor: '#6e707e', titleFontSize: 14, borderColor: '#dddfeb', borderWidth: 1,
                 xPadding: 15, yPadding: 15, displayColors: false, intersect: false, mode: 'index', caretPadding: 10,
-                callbacks: {
-                    label: function(tooltipItem, chart) {
-                        var datasetLabel = chart.datasets[tooltipItem.datasetIndex].label || '';
-                        return datasetLabel + ': ' + number_format(tooltipItem.yLabel);
-                    }
-                }
             }
         }
     });

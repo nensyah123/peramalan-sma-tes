@@ -1,232 +1,329 @@
 /* ===================================================== */
-/* SIDEBAR                                               */
+/* SIDEBAR - Panel navigasi di sebelah kiri              */
 /* ===================================================== */
 
-.sidebar{
-    background-color:#353B3B !important;
-    z-index:20;
+/* Warna background utama sidebar */
+.sidebar {
+    background-color: #353B3B !important;
+    z-index: 20; /* Sidebar tampil di atas elemen lain */
 }
 
-/* HEADER SIDEBAR (LOGO) */
-.sidebar-header{
-    background:#ffffff;
-    height:75px;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    border-bottom:1px solid #e5e5e5; /* sudah disamakan dengan topbar */
+/* --- Area logo di bagian paling atas sidebar --- */
+.sidebar-brand-area {
+    background: #ffffff !important;   /* Background putih untuk area logo */
+    height: 62px !important;          /* Tinggi harus sama dengan topbar agar sejajar */
+    display: flex !important;
+    align-items: center !important;   /* Logo rata tengah secara vertikal */
+    justify-content: center !important; /* Logo rata tengah secara horizontal */
+    border-bottom: 1px solid #e5e5e5 !important; /* Garis bawah pemisah */
+    padding: 10px 16px !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
 }
 
-.sidebar-logo{
-    height:55px;
-    width:auto;
-    object-fit:contain;
+/* Ukuran gambar logo di sidebar */
+.sidebar-brand-area img {
+    max-height: 50px;       /* Maksimal tinggi logo */
+    max-width: 100%;        /* Logo tidak melebihi lebar container */
+    width: auto;
+    object-fit: contain;    /* Gambar tidak terpotong/terdistorsi */
+    display: block;
 }
 
+/* Tampilan logo saat sidebar diperkecil (tombol toggle ditekan) */
+body.sidebar-toggled .sidebar-brand-area {
+    padding: 10px 6px !important;   /* Padding lebih kecil karena sidebar sempit */
+    height: 62px !important;
+}
+
+/* Ukuran logo saat sidebar diperkecil */
+body.sidebar-toggled .sidebar-brand-area img {
+    max-height: 38px;   /* Logo dikecilkan agar muat di sidebar sempit */
+    max-width: 100%;
+}
 
 /* ===================================================== */
-/* MENU SIDEBAR                                          */
+/* SIDEBAR - Judul section (MAIN, MANAGEMENT, dll)       */
 /* ===================================================== */
 
-.sidebar .nav-item .nav-link{
-    color:rgba(255,255,255,0.85) !important;
-    font-size:15px;
-    padding:14px 18px;
-    border-radius:8px;
-    margin:4px 10px;
-    transition:0.25s;
+/* Teks kecil sebagai judul grup menu */
+.sidebar-section-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;          /* Huruf kapital semua */
+    color: rgba(255,255,255,0.45);      /* Putih transparan agar tidak terlalu mencolok */
+    padding: 14px 20px 6px;
+    margin: 0;
 }
-
-.sidebar .nav-item .nav-link i{
-    color:rgba(255,255,255,0.75) !important;
-}
-
-
-/* HOVER */
-.sidebar .nav-item .nav-link:hover{
-    background-color:#40484f;
-    color:#ffffff !important;
-}
-
-.sidebar .nav-item .nav-link:hover i{
-    color:#ffffff !important;
-}
-
-
-/* ACTIVE MENU (indikator kiri elegan) */
-.sidebar .nav-item.active .nav-link{
-    background-color:transparent !important;
-    border-left:4px solid #ffffff;
-    color:#ffffff !important;
-    border-radius:0;
-    margin-left:0;
-    padding-left:14px;
-}
-
-.sidebar .nav-item.active .nav-link i{
-    color:#ffffff !important;
-}
-
-
-/* HEADING */
-.sidebar .sidebar-heading{
-    color:rgba(255,255,255,0.55) !important;
-    font-size:12px;
-    font-weight:700;
-    letter-spacing:1px;
-    padding-left:20px;
-}
-
-
-/* ===========*/
-/* SUB MENU
-/* ===========*/
-
-.collapse{
-    transition:all 0.25s ease;
-}
-
-.collapse-inner{
-    border-radius:10px !important;
-    overflow:hidden;
-    background:#ffffff !important; /* wajib biar kontras */
-}
-
-.collapse-item{
-    font-size:14px;
-    padding:11px 18px !important;
-    color:#333 !important;     /* 🔥 penyelamat tulisan */
-    display:block;
-}
-
-.collapse-item:hover{
-    background-color:#e4e4e4 !important;
-    color:#000 !important;
-    font-weight:600;
-}
-
-.collapse-item.active{
-    background-color:#dcdcdc !important;
-    color:#000 !important;
-    font-weight:700 !important;
-}
-
 
 /* ===================================================== */
-/* TOPBAR / HEADER                                       */
+/* SIDEBAR - Tampilan item menu                          */
 /* ===================================================== */
 
-.custom-topbar{
-    background:#ffffff;
-    border-bottom:1px solid #e5e5e5;
-    height:75px;
-    padding:0 25px;
-    display:flex;
-    align-items:center;
+/* Tampilan menu dalam kondisi normal */
+.sidebar .nav-item .nav-link {
+    color: rgba(255,255,255,0.85) !important; /* Teks putih sedikit transparan */
+    font-size: 15px;
+    padding: 14px 18px;
+    border-radius: 8px;     /* Sudut menu membulat */
+    margin: 4px 10px;
+    transition: 0.25s;      /* Animasi halus saat hover */
 }
 
-/* Judul */
-.topbar-title{
-    display:flex;
-    flex-direction:column;
+/* Warna icon menu normal */
+.sidebar .nav-item .nav-link i {
+    color: rgba(255,255,255,0.75) !important;
 }
 
-.system-title{
-    font-size:18px;
-    font-weight:800;
-    color:#2f2f2f;
-    letter-spacing:0.8px;
-    text-transform:uppercase;
+/* Tampilan menu saat mouse diarahkan ke menu (hover) */
+.sidebar .nav-item .nav-link:hover {
+    background-color: #40484f; /* Background sedikit lebih terang saat hover */
+    color: #ffffff !important;
 }
 
-.system-subtitle{
-    font-size:13px;
-    font-weight:600;
-    color:#777;
+/* Warna icon saat hover */
+.sidebar .nav-item .nav-link:hover i {
+    color: #ffffff !important;
 }
 
-
-/* Garis pembatas kanan */
-.topbar-divider{
-    height:45px;
-    width:2px;
-    background:#d9d9d9;
-    margin-right:18px;
+/* Tampilan menu yang sedang aktif (halaman yang sedang dibuka) */
+.sidebar .nav-item.active .nav-link {
+    background-color: transparent !important;
+    border-left: 4px solid #ffffff; /* Garis putih di kiri sebagai tanda aktif */
+    color: #ffffff !important;
+    border-radius: 0;
+    margin-left: 0;
+    padding-left: 14px;
 }
 
-
-/* Area user */
-.user-area{
-    padding:0 !important;
-    display:flex;
-    align-items:center;
+/* Warna icon menu aktif */
+.sidebar .nav-item.active .nav-link i {
+    color: #ffffff !important;
 }
 
-.username{
-    margin-right:10px;
-    font-weight:700;
-    color:#BE4132;
-    font-size:14px;
+/* Heading bawaan template SB Admin 2 */
+.sidebar .sidebar-heading {
+    color: rgba(255,255,255,0.55) !important;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    padding-left: 20px;
 }
-
-.user-avatar{
-    height:42px;
-    width:42px;
-    border-radius:50%;
-    border:2px solid #BE4132;
-    box-shadow:0 3px 10px rgba(0,0,0,0.15);
-}
-
-.user-dropdown{
-    border-radius:12px;
-    padding:10px 0;
-}
-
-.logout-btn{
-    font-weight:600;
-}
-
 
 /* ===================================================== */
-/* BUTTON MERAH (GLOBAL)                                 */
+/* SIDEBAR - Sub menu (menu yang bisa dibuka/tutup)      */
 /* ===================================================== */
 
-.btn-primary{
-    background-color:#BE4132 !important;
-    border-color:#BE4132 !important;
+/* Khusus layar desktop (lebar minimal 768px) */
+@media (min-width: 768px) {
+
+    /* Jarak sub menu dari tepi sidebar */
+    .sidebar .nav-item .collapse,
+    .sidebar .nav-item .collapsing {
+        margin: 0 10px !important;
+    }
+
+    /* Sudut kotak sub menu membulat */
+    .sidebar .nav-item .collapse .collapse-inner {
+        border-radius: 10px !important;
+        box-shadow: none !important;
+    }
+
+    /* Reset jarak sub menu saat sidebar diperkecil */
+    .sidebar.toggled .nav-item .collapse,
+    .sidebar.toggled .nav-item .collapsing {
+        margin: 0 !important;
+    }
 }
 
-.btn-primary:hover{
-    background-color:#9e2f23 !important;
-    border-color:#9e2f23 !important;
+/* Kotak pembungkus sub menu */
+.sidebar .nav-item .collapse .collapse-inner,
+.sidebar .nav-item .collapsing .collapse-inner {
+    border-radius: 10px !important;
+    overflow: hidden !important;
+    background: #ffffff !important; /* Background putih untuk sub menu */
+    margin-bottom: 6px !important;
+    padding: 0 !important;
 }
 
+/* Tampilan setiap item di dalam sub menu */
+.sidebar .nav-item .collapse .collapse-inner .collapse-item,
+.sidebar .nav-item .collapsing .collapse-inner .collapse-item {
+    font-size: 14px !important;
+    padding: 11px 18px !important;
+    margin: 0 !important;
+    color: #333333 !important;      /* Teks gelap karena background putih */
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;            /* Jarak antara icon dan teks */
+    text-decoration: none !important;
+    border-radius: 0 !important;
+    white-space: normal !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    background-color: #ffffff !important;
+}
+
+/* Warna icon di dalam sub menu */
+.sidebar .nav-item .collapse .collapse-inner .collapse-item i,
+.sidebar .nav-item .collapsing .collapse-inner .collapse-item i {
+    color: #666666 !important;
+    font-size: 0.82rem !important;
+}
+
+/* Tampilan item sub menu saat di-hover */
+.sidebar .nav-item .collapse .collapse-inner .collapse-item:hover,
+.sidebar .nav-item .collapsing .collapse-inner .collapse-item:hover {
+    background-color: #e4e4e4 !important; /* Background abu-abu saat hover */
+    color: #000000 !important;
+    font-weight: 600 !important;
+    text-decoration: none !important;
+}
+
+/* Warna icon sub menu saat di-hover */
+.sidebar .nav-item .collapse .collapse-inner .collapse-item:hover i,
+.sidebar .nav-item .collapsing .collapse-inner .collapse-item:hover i {
+    color: #BE4132 !important; /* Icon berubah merah saat hover */
+}
+
+/* Tampilan item sub menu yang sedang aktif */
+.sidebar .nav-item .collapse .collapse-inner .collapse-item.active,
+.sidebar .nav-item .collapsing .collapse-inner .collapse-item.active {
+    background-color: #dcdcdc !important; /* Background lebih gelap untuk yang aktif */
+    color: #000000 !important;
+    font-weight: 700 !important; /* Teks tebal untuk yang aktif */
+}
+
+/* Warna icon sub menu yang sedang aktif */
+.sidebar .nav-item .collapse .collapse-inner .collapse-item.active i,
+.sidebar .nav-item .collapsing .collapse-inner .collapse-item.active i {
+    color: #BE4132 !important; /* Icon merah untuk yang aktif */
+}
+
+/* ===================================================== */
+/* TOPBAR - Bar navigasi di bagian atas halaman          */
+/* ===================================================== */
+
+/* Container utama topbar */
+.custom-topbar {
+    background: #ffffff;
+    border-bottom: 1px solid #e5e5e5; /* Garis bawah pemisah topbar dan konten */
+    height: 75px;                      /* Tinggi topbar */
+    padding: 0 25px;
+    display: flex;
+    align-items: center;              /* Semua elemen rata tengah vertikal */
+}
+
+/* Wrapper untuk judul sistem */
+.topbar-title {
+    display: flex;
+    flex-direction: column; /* Judul dan sub judul ditumpuk ke bawah */
+}
+
+/* Teks judul sistem besar */
+.system-title {
+    font-size: 18px;
+    font-weight: 800;
+    color: #2f2f2f;
+    letter-spacing: 0.8px;
+    text-transform: uppercase; /* Semua huruf kapital */
+}
+
+/* Teks sub judul sistem kecil */
+.system-subtitle {
+    font-size: 13px;
+    font-weight: 600;
+    color: #777; /* Warna abu-abu lebih lembut */
+}
+
+/* Garis pemisah vertikal antara judul dan info user */
+.topbar-divider {
+    height: 45px;
+    width: 2px;
+    background: #d9d9d9;
+    margin-right: 18px;
+}
+
+/* Area yang menampilkan nama dan foto user */
+.user-area {
+    padding: 0 !important;
+    display: flex;
+    align-items: center;
+}
+
+/* Teks nama user */
+.username {
+    margin-right: 10px;
+    font-weight: 700;
+    color: #BE4132; /* Warna merah sesuai tema */
+    font-size: 14px;
+}
+
+/* Foto profil user (bulat) */
+.user-avatar {
+    height: 42px;
+    width: 42px;
+    border-radius: 50%;                     /* Membuat foto menjadi bulat */
+    border: 2px solid #BE4132;              /* Border merah sesuai tema */
+    box-shadow: 0 3px 10px rgba(0,0,0,0.15); /* Bayangan halus */
+}
+
+/* Dropdown menu yang muncul saat klik nama user */
+.user-dropdown {
+    border-radius: 12px; /* Sudut dropdown membulat */
+    padding: 10px 0;
+}
+
+/* Tombol logout di dalam dropdown */
+.logout-btn {
+    font-weight: 600;
+}
+
+/* ===================================================== */
+/* BUTTON - Tombol merah yang dipakai di seluruh halaman */
+/* ===================================================== */
+
+/* Tampilan tombol normal */
+.btn-primary {
+    background-color: #BE4132 !important;
+    border-color: #BE4132 !important;
+}
+
+/* Tampilan tombol saat di-hover */
+.btn-primary:hover {
+    background-color: #9e2f23 !important; /* Merah lebih gelap saat hover */
+    border-color: #9e2f23 !important;
+}
+
+/* Tampilan tombol saat diklik atau fokus */
 .btn-primary:focus,
-.btn-primary:active{
-    background-color:#7f251c !important;
-    border-color:#7f251c !important;
-    box-shadow:none !important;
+.btn-primary:active {
+    background-color: #7f251c !important; /* Merah paling gelap saat diklik */
+    border-color: #7f251c !important;
+    box-shadow: none !important;
 }
-
 
 /* ===================================================== */
-/* CARD                                                  */
+/* CARD - Kotak konten yang dipakai di seluruh halaman   */
 /* ===================================================== */
 
-.card{
-    border-radius:10px;
+/* Sudut card dibuat melengkung */
+.card {
+    border-radius: 15px;
 }
 
-.card-header{
-    background:#fff;
-    border-bottom:2px solid #f1f1f1;
+/* Bagian header di dalam card */
+.card-header {
+    background: #fff;
+    border-bottom: 2px solid #f1f1f1; /* Garis bawah tipis pemisah header dan isi */
 }
 
-/* Judul card jadi merah */
+/* Warna teks merah pada judul card dan elemen bertema primary */
 .card-header,
 .card-header h5,
 .card-header h6,
-.text-primary{
-    color:#BE4132 !important;
-    font-weight:700;
+.text-primary {
+    color: #BE4132 !important; /* Merah sesuai tema */
+    font-weight: 700;
 }

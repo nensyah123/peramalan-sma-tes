@@ -2,10 +2,6 @@
 
 @section('content')
 
-<!-- Page Heading -->
-<div class="d-sm-flex align-items-center justify-content-between mb-4">
-  <h1 class="h3 mb-0 text-gray-800">Management Data Pemakaian</h1>
-</div>
 
 @if(session('success'))
 <div class="alert alert-success alert-dismissible fade show" role="alert" id="success-alert">
@@ -123,8 +119,8 @@
                         <td>{{ $item->tahun }}</td>
                         <td>{{ $item->jumlah_transaksi }}</td>
                         <td>
-                            <button class="btn btn-warning btn-sm btn-circle" 
-                                onclick="editData({{ $item->id }}, {{ $item->id_kendaraan }}, {{ $item->bulan }}, {{ $item->tahun }}, {{ $item->jumlah_transaksi }})" 
+                            <button class="btn btn-warning btn-sm btn-circle"
+                                onclick="editData({{ $item->id }}, {{ $item->id_kendaraan }}, {{ $item->bulan }}, {{ $item->tahun }}, {{ $item->jumlah_transaksi }})"
                                 title="Edit">
                                 <i class="fas fa-pen"></i>
                             </button>
@@ -255,12 +251,12 @@
         var url = "{{ route('input_data.update', ':id') }}";
         url = url.replace(':id', id);
         document.getElementById('editForm').action = url;
-        
+
         document.getElementById('edit_id_kendaraan').value = id_kendaraan;
         document.getElementById('edit_bulan').value = bulan;
         document.getElementById('edit_tahun').value = tahun;
         document.getElementById('edit_jumlah_transaksi').value = jumlah;
-        
+
         $('#editModal').modal('show');
     }
 </script>

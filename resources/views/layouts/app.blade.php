@@ -24,8 +24,11 @@
     <link href="{{ asset('template/vendor/datatables/dataTables.bootstrap4.min.css') }}" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
-    <!-- Fix sidebar menu text terpotong -->
+    <!-- ============================================
+         FIX SIDEBAR — letakkan SETELAH sb-admin-2
+         ============================================ -->
     <style>
+        /* --- Fix teks submenu terpotong --- */
         .sidebar .nav-item .collapse .collapse-inner .collapse-item,
         .sidebar .nav-item .collapsing .collapse-inner .collapse-item {
             white-space: normal !important;
@@ -37,6 +40,58 @@
             .sidebar .nav-item .collapsing {
                 min-width: 200px;
             }
+        }
+
+        /* --- FIX 1: Logo border sejajar header --- */
+        .sidebar-header {
+            background: #ffffff !important;
+            height: 75px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            border-bottom: 1px solid #e5e5e5 !important;
+        }
+
+        /* --- FIX 2: Submenu selalu terlihat tanpa diklik --- */
+
+        /* Background putih agar kontras */
+        .sidebar .nav-item .collapse-inner,
+        .sidebar .nav-item .collapsing .collapse-inner {
+            background: #ffffff !important;
+            border-radius: 10px !important;
+            overflow: hidden !important;
+            margin: 0 10px 6px 10px !important;
+        }
+
+        /* Teks submenu gelap & selalu visible */
+        .sidebar .nav-item .collapse-inner .collapse-item {
+            color: #333333 !important;
+            font-size: 14px !important;
+            padding: 11px 18px !important;
+            display: block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            text-decoration: none !important;
+            background: transparent !important;
+        }
+
+        /* Icon submenu */
+        .sidebar .nav-item .collapse-inner .collapse-item i {
+            color: #555555 !important;
+        }
+
+        /* Hover submenu */
+        .sidebar .nav-item .collapse-inner .collapse-item:hover {
+            background-color: #e4e4e4 !important;
+            color: #000000 !important;
+            font-weight: 600 !important;
+        }
+
+        /* Active submenu */
+        .sidebar .nav-item .collapse-inner .collapse-item.active {
+            background-color: #dcdcdc !important;
+            color: #000000 !important;
+            font-weight: 700 !important;
         }
     </style>
 
