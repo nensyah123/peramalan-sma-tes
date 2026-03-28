@@ -169,7 +169,7 @@
                 <p class="text-center">${data.summary}</p>
             </div>
         </div>`;
-        
+
         $('#dynamicCardContainer').html(html);
         // Scroll to card
         $('html, body').animate({
@@ -223,13 +223,13 @@
         </div>`;
 
         $('#dynamicCardContainer').html(html);
-        
+
         // Render Chart
         var ctx = document.getElementById("compChartCanvas");
         if (currentChart) {
              currentChart.destroy();
         }
-        
+
         currentChart = new Chart(ctx, {
             type: 'line',
             data: {
@@ -282,4 +282,3 @@
     }
 </script>
 @endpush
-ak

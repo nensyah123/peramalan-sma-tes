@@ -4,117 +4,128 @@ namespace App\Http\Controllers;
 
 use App\Models\Kendaraan;
 use App\Models\PeramalanTes;
-use App\Models\PemakaianKendaraan;
+use App\Models\TransaksiPenyewaan;
 use Illuminate\Http\Request;
-use Barryvdh\DomPDF\Facade\Pdf;
 
 class PerbandinganController extends Controller
 {
-    /**
-     * Menampilkan Halaman Riwayat Peramalan.
-     */
     public function index()
     {
-        $riwayat = PeramalanTes::with('kendaraan')->latest()->get();
+        $riwayat = PeramalanTes::latest()->get();
         return view('menu.perbandingan', compact('riwayat'));
     }
 
-    /**
-     * Menampilkan Detail Peramalan TES (Fitur Lihat).
-     */
     public function show($id)
     {
-        $peramalan = PeramalanTes::with('kendaraan')->findOrFail($id);
+        $peramalan = PeramalanTes::findOrFail($id);
 
         $kualitas = 'kurang akurat (> 50%)';
-        if ($peramalan->mape < 10)      $kualitas = 'sangat baik (< 10%)';
-        elseif ($peramalan->mape < 20)  $kualitas = 'baik (10-20%)';
-        elseif ($peramalan->mape < 50)  $kualitas = 'wajar (20-50%)';
+        if ($peramalan->mape < 10)     $kualitas = 'sangat baik (< 10%)';
+        elseif ($peramalan->mape < 20) $kualitas = 'baik (10-20%)';
+        elseif ($peramalan->mape < 50) $kualitas = 'wajar (20-50%)';
 
         return response()->json([
-            'kendaraan'  => $peramalan->kendaraan->nama_kendaraan,
-            'periode'    => $peramalan->periode_label,
+            'merk'       => $peramalan->merk,
             'mad'        => $peramalan->mad,
             'mse'        => $peramalan->mse,
             'mape'       => $peramalan->mape,
             'created_at' => $peramalan->created_at->format('Y-m-d'),
-            'summary'    => "Hasil peramalan TES untuk {$peramalan->kendaraan->nama_kendaraan} pada periode {$peramalan->periode_label}, disimpan pada {$peramalan->created_at->format('Y-m-d')}. Nilai MAPE sebesar {$peramalan->mape}% menunjukkan tingkat akurasi yang {$kualitas}."
+            'summary'    => "Hasil peramalan TES untuk {$peramalan->merk} disimpan pada {$peramalan->created_at->format('Y-m-d')}. Nilai MAPE sebesar {$peramalan->mape}% menunjukkan tingkat akurasi yang {$kualitas}."
         ]);
     }
 
-    /**
-     * Melakukan Perbandingan TES (Grid Search 729 kombinasi) vs SMA.
-     * TES dihitung ulang dengan parameter optimal dari data historis.
-     */
     public function compare($id)
     {
-        $peramalanTes = PeramalanTes::with('kendaraan')->findOrFail($id);
+        $peramalanTes = PeramalanTes::findOrFail($id);
+        $merk         = $peramalanTes->merk;
+        $durasi       = (int) $peramalanTes->durasi_prediksi;
+        $s            = 12;
 
-        // Ambil data historis asli dari database (bukan dari JSON tersimpan)
-        $dataPemakaian = PemakaianKendaraan::where('id_kendaraan', $peramalanTes->id_kendaraan)
+        // Ambil id kendaraan berdasarkan merk
+        $ids = Kendaraan::where('merk', $merk)->pluck('id');
+
+        // Exclude bulan berjalan
+        $bulanSekarang = (int) date('m');
+        $tahunSekarang = (int) date('Y');
+
+        $raw = TransaksiPenyewaan::selectRaw(
+                'MONTH(tgl_pinjam) as bulan, YEAR(tgl_pinjam) as tahun, COUNT(*) as total'
+            )
+            ->whereIn('id_kendaraan', $ids)
+            ->where(function ($query) use ($bulanSekarang, $tahunSekarang) {
+                $query->whereYear('tgl_pinjam', '<', $tahunSekarang)
+                      ->orWhere(function ($q) use ($bulanSekarang, $tahunSekarang) {
+                          $q->whereYear('tgl_pinjam', '=', $tahunSekarang)
+                            ->whereMonth('tgl_pinjam', '<', $bulanSekarang);
+                      });
+            })
+            ->groupBy('tahun', 'bulan')
             ->orderBy('tahun', 'asc')
             ->orderBy('bulan', 'asc')
             ->get();
 
-        $L = 12; // Panjang musim bulanan
+        // Susun data
+        $values    = [];
+        $labels    = [];
+        $bulanData = [];
 
-        // Bangun array data
-        $d = [];
-        foreach ($dataPemakaian as $pem) {
-            $d[] = [
-                'bulan'       => $pem->bulan,
-                'tahun'       => $pem->tahun,
-                'aktual'      => $pem->jumlah_transaksi,
-                'bulan_tahun' => $this->getMonthName($pem->bulan) . ' ' . $pem->tahun,
-            ];
+        foreach ($raw as $row) {
+            $values[]    = (float) $row->total;
+            $labels[]    = $this->getMonthName((int) $row->bulan) . ' ' . $row->tahun;
+            $bulanData[] = ['bulan' => (int) $row->bulan, 'tahun' => (int) $row->tahun];
         }
 
-        $nData   = count($d);
-        $durasi  = $peramalanTes->durasi_prediksi;
+        // ===== STEP 1: Dapatkan α, β, γ optimal dari Python =====
+        try {
+            $params = $this->getOptimalParams($values);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
 
-        // ---- GRID SEARCH: 729 Kombinasi (alpha x beta x gamma) ----
-        $optimal = $this->gridSearch($d, $L);
-        $alpha   = $optimal['alpha'];
-        $beta    = $optimal['beta'];
-        $gamma   = $optimal['gamma'];
+        $alpha = $params['alpha'];
+        $beta  = $params['beta'];
+        $gamma = $params['gamma'];
 
-        // ---- HITUNG TES DENGAN PARAMETER OPTIMAL ----
-        $tesResult = $this->hitungTESLengkap($d, $alpha, $beta, $gamma, $L, $durasi);
+        // ===== STEP 2: Hitung TES Manual di PHP =====
+        $tesResult = $this->hitungTESManual(
+            $values, $labels, $bulanData,
+            $alpha, $beta, $gamma,
+            $durasi, $s
+        );
 
-        // ---- HITUNG SMA PERIODE 3 BULAN ----
-        $periode_sma = 3;
+        $mape_tes = $tesResult['mape'];
+        $mad_tes  = $tesResult['mad'];
+        $mse_tes  = $tesResult['mse'];
+
+        // ===== STEP 3: Hitung SMA dengan m=12 =====
+        // m=12 disesuaikan dengan seasonal period TES
+        $periode_sma = 12;
         $dataAktual  = [];
-        foreach ($d as $row) {
+        foreach ($raw as $row) {
             $dataAktual[] = [
-                'aktual'      => $row['aktual'],
-                'bulan_tahun' => $row['bulan_tahun'],
+                'aktual'      => (float) $row->total,
+                'bulan_tahun' => $this->getMonthName((int) $row->bulan) . ' ' . $row->tahun,
             ];
         }
         $smaResult = $this->calculateSMA($dataAktual, $periode_sma, $durasi);
+        $mape_sma  = $smaResult['metrics']['mape'];
 
-        // ---- SIAPKAN DATA CHART ----
+        // ===== Susun data chart =====
         $chartLabels    = [];
         $actualData     = [];
         $tesPredictions = [];
 
-        foreach ($tesResult['table'] as $row) {
+        foreach ($tesResult['result_table'] as $row) {
             $chartLabels[]    = $row['bulan_tahun'];
-            $actualData[]     = ($row['aktual'] !== '-' && $row['aktual'] !== null) ? $row['aktual'] : null;
-            $tesPredictions[] = ($row['prediksi'] !== '-' && $row['prediksi'] !== null) ? $row['prediksi'] : null;
+            $actualData[]     = ($row['aktual'] !== '-') ? (float) $row['aktual'] : null;
+            $tesPredictions[] = ($row['prediksi'] !== '-') ? (float) $row['prediksi'] : null;
         }
 
         $smaPredictions = $smaResult['chart']['predicted'];
-
-        // Sesuaikan panjang array SMA agar sama dengan TES (padding null jika perlu)
-        while (count($smaPredictions) < count($chartLabels)) {
-            $smaPredictions[] = null;
-        }
+        while (count($smaPredictions) < count($chartLabels)) $smaPredictions[] = null;
         $smaPredictions = array_slice($smaPredictions, 0, count($chartLabels));
 
-        // ---- KESIMPULAN/PERBANDINGAN ----
-        $mape_tes = $tesResult['metrics']['mape'];
-        $mape_sma = $smaResult['metrics']['mape'];
-        $better   = ($mape_sma < $mape_tes) ? 'SMA' : 'TES';
+        $better     = ($mape_sma < $mape_tes) ? 'SMA' : 'TES';
         $betterMape = ($better === 'SMA') ? $mape_sma : $mape_tes;
 
         return response()->json([
@@ -129,229 +140,215 @@ class PerbandinganController extends Controller
                     'alpha' => $alpha,
                     'beta'  => $beta,
                     'gamma' => $gamma,
-                    'mad'   => $tesResult['metrics']['mad'],
-                    'mse'   => $tesResult['metrics']['mse'],
+                    'mad'   => $mad_tes,
+                    'mse'   => $mse_tes,
                     'mape'  => $mape_tes,
                 ],
                 'sma' => $smaResult['metrics'],
             ],
-            'conclusion' => "Berdasarkan Grid Search (729 kombinasi), parameter optimal TES: α={$alpha}, β={$beta}, γ={$gamma}. Metode <strong>{$better}</strong> lebih akurat dengan MAPE {$betterMape}%."
+            'conclusion' => "Berdasarkan optimasi Statsmodels, parameter optimal TES: α={$alpha}, β={$beta}, γ={$gamma}. Metode <strong>{$better}</strong> lebih akurat dengan MAPE {$betterMape}%."
         ]);
     }
 
-    /**
-     * Menghapus Riwayat Peramalan.
-     */
     public function destroy($id)
     {
         PeramalanTes::findOrFail($id)->delete();
-        return redirect()->route('perbandingan.index')->with('success', 'Riwayat peramalan berhasil dihapus.');
+        return redirect()->route('perbandingan.index')
+            ->with('success', 'Riwayat peramalan berhasil dihapus.');
     }
 
-    // =========================================================
-    // HELPER: Grid Search — 729 kombinasi (0.1 s/d 0.9, step 0.1)
-    // Kriteria: MAPE terkecil
-    // =========================================================
-    private function gridSearch(array $d, int $L): array
+    // ===== PYTHON: HANYA UNTUK OPTIMASI α, β, γ =====
+    private function getOptimalParams(array $values): array
     {
-        $bestMape  = PHP_INT_MAX;
-        $bestAlpha = 0.1;
-        $bestBeta  = 0.1;
-        $bestGamma = 0.1;
+        $input = json_encode(['values' => $values]);
 
-        $steps = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9];
+        $tmpFile = storage_path('app/tes_compare_' . time() . '.json');
+        file_put_contents($tmpFile, $input);
 
-        foreach ($steps as $alpha) {
-            foreach ($steps as $beta) {
-                foreach ($steps as $gamma) {
-                    $result = $this->hitungTESMetrik($d, $alpha, $beta, $gamma, $L);
-                    if ($result['mape'] < $bestMape) {
-                        $bestMape  = $result['mape'];
-                        $bestAlpha = $alpha;
-                        $bestBeta  = $beta;
-                        $bestGamma = $gamma;
-                    }
-                }
+        $scriptPath = base_path('tes_optimize.py');
+        $command    = "python \"$scriptPath\" \"$tmpFile\" 2>&1";
+        $outputRaw  = shell_exec($command);
+
+        @unlink($tmpFile);
+
+        $result = json_decode($outputRaw, true);
+
+        if (!$result || !isset($result['alpha'])) {
+            throw new \Exception('Gagal menjalankan Python: ' . $outputRaw);
+        }
+
+        return $result;
+    }
+
+    // ===== TAHAP 1: INISIALISASI MANUAL =====
+    private function hitungInisialisasi(array $values, int $s = 12): array
+    {
+        $n = count($values);
+
+        // Level awal = rata-rata 12 data pertama
+        $L0 = array_sum(array_slice($values, 0, $s)) / $s;
+
+        // Trend awal = rata-rata selisih antar musim / s
+        $trendSum   = 0;
+        $trendCount = 0;
+        for ($i = 0; $i < $s; $i++) {
+            if (($s + $i) < $n) {
+                $trendSum += ($values[$s + $i] - $values[$i]) / $s;
+                $trendCount++;
             }
         }
+        $b0 = $trendCount > 0 ? $trendSum / $trendCount : 0;
 
-        return [
-            'alpha' => $bestAlpha,
-            'beta'  => $bestBeta,
-            'gamma' => $bestGamma,
-        ];
+        // Seasonal awal = Yk - L0
+        $S0 = [];
+        for ($i = 0; $i < $s; $i++) {
+            $S0[$i] = $values[$i] - $L0;
+        }
+
+        return ['L0' => $L0, 'b0' => $b0, 'S0' => $S0];
     }
 
-    // =========================================================
-    // HELPER: Hitung TES — hanya metrik (untuk Grid Search)
-    // =========================================================
-    private function hitungTESMetrik(array $d, float $alpha, float $beta, float $gamma, int $L): array
-    {
-        $nData = count($d);
-        if ($nData < $L) return ['mape' => PHP_INT_MAX, 'mad' => PHP_INT_MAX, 'mse' => PHP_INT_MAX];
+    // ===== TAHAP 2 & 3: ITERASI + FORECAST MANUAL =====
+    private function hitungTESManual(
+        array $values,
+        array $labels,
+        array $bulanData,
+        float $alpha,
+        float $beta,
+        float $gamma,
+        int   $durasi,
+        int   $s = 12
+    ): array {
+        $n = count($values);
 
         // Inisialisasi
-        $avgFirstSeason = 0;
-        for ($i = 0; $i < $L; $i++) $avgFirstSeason += $d[$i]['aktual'];
-        $avgFirstSeason /= $L;
+        $init = $this->hitungInisialisasi($values, $s);
+        $L    = $init['L0'];
+        $b    = $init['b0'];
+        $S    = $init['S0'];
 
-        $seasonals = [];
-        for ($i = 0; $i < $L; $i++) $seasonals[] = $d[$i]['aktual'] - $avgFirstSeason;
+        $resultTable = [];
+        $totalMad    = 0;
+        $totalMse    = 0;
+        $totalMape   = 0;
+        $count       = 0;
 
-        $currLevel = $avgFirstSeason;
-        $currTrend = 0;
+        for ($i = 0; $i < $n; $i++) {
+            $aktual = $values[$i];
 
-        if ($nData >= 2 * $L) {
-            $sumSecond = 0;
-            for ($i = $L; $i < 2 * $L; $i++) $sumSecond += $d[$i]['aktual'];
-            $currTrend = ($sumSecond / $L - $avgFirstSeason) / $L;
-        }
+            // Baris 1-11: kosong semua (periode inisialisasi)
+            if ($i < 11) {
+                $resultTable[] = [
+                    'bulan_tahun' => $labels[$i],
+                    'aktual'      => $aktual,
+                    'level'       => '-',
+                    'trend'       => '-',
+                    'seasonal'    => '-',
+                    'prediksi'    => '-',
+                    'error'       => '-',
+                    'error_sqr'   => '-',
+                    'ape'         => '-',
+                ];
+                continue;
+            }
 
-        $seasonal_indices    = $seasonals;
-        $total_error_abs     = 0;
-        $total_error_sqr     = 0;
-        $total_ape           = 0;
-        $count_error         = 0;
+            // Baris 12 (Des): tampilkan nilai awal inisialisasi
+            if ($i === 11) {
+                $resultTable[] = [
+                    'bulan_tahun' => $labels[$i],
+                    'aktual'      => $aktual,
+                    'level'       => round($L, 4),
+                    'trend'       => round($b, 4),
+                    'seasonal'    => round($S[11], 4),
+                    'prediksi'    => '-',
+                    'error'       => '-',
+                    'error_sqr'   => '-',
+                    'ape'         => '-',
+                ];
+                continue;
+            }
 
-        for ($i = $L; $i < $nData; $i++) {
-            $prevLevel    = $currLevel;
-            $prevTrend    = $currTrend;
-            $prevSeasonal = $seasonal_indices[$i - $L];
+            // Baris 13+: iterasi menggunakan rumus Holt-Winters
+            $St_s = $S[$i % $s];
 
-            $prediksi  = $prevLevel + $prevTrend + $prevSeasonal;
-            $aktual    = $d[$i]['aktual'];
-            $error_abs = abs($aktual - $prediksi);
+            // FIX: Hitung Ft_raw TANPA dibulatkan dulu
+            // agar error & APE lebih presisi (sama dengan Excel)
+            $Ft_raw = $L + $b + $St_s;
 
-            $total_error_abs += $error_abs;
-            $total_error_sqr += pow($error_abs, 2);
-            $total_ape       += ($aktual != 0) ? ($error_abs / $aktual) * 100 : 0;
-            $count_error++;
+            // Update Level
+            $L_new = $alpha * ($aktual - $St_s) + (1 - $alpha) * ($L + $b);
 
-            $newLevel    = $alpha * ($aktual - $prevSeasonal)  + (1 - $alpha) * ($prevLevel + $prevTrend);
-            $newTrend    = $beta  * ($newLevel - $prevLevel)   + (1 - $beta)  * $prevTrend;
-            $newSeasonal = $gamma * ($aktual - $newLevel)      + (1 - $gamma) * $prevSeasonal;
+            // Update Trend
+            $b_new = $beta * ($L_new - $L) + (1 - $beta) * $b;
 
-            $currLevel           = $newLevel;
-            $currTrend           = $newTrend;
-            $seasonal_indices[]  = $newSeasonal;
-        }
+            // Update Seasonal
+            $S[$i % $s] = $gamma * ($aktual - $L_new) + (1 - $gamma) * $St_s;
 
-        if ($count_error === 0) return ['mape' => PHP_INT_MAX, 'mad' => PHP_INT_MAX, 'mse' => PHP_INT_MAX];
+            $L = $L_new;
+            $b = $b_new;
 
-        return [
-            'mad'  => round($total_error_abs / $count_error, 2),
-            'mse'  => round($total_error_sqr / $count_error, 2),
-            'mape' => round($total_ape / $count_error, 2),
-        ];
-    }
+            // FIX: Hitung Error dari Ft_raw (nilai asli, bukan yang dibulatkan)
+            $err = abs($aktual - $Ft_raw);
+            $ape = $aktual != 0 ? ($err / $aktual) * 100 : 0;
 
-    // =========================================================
-    // HELPER: Hitung TES lengkap (tabel + prediksi masa depan)
-    // =========================================================
-    private function hitungTESLengkap(array $d, float $alpha, float $beta, float $gamma, int $L, int $durasi): array
-    {
-        $nData = count($d);
+            $totalMad  += $err;
+            $totalMse  += $err ** 2;
+            $totalMape += $ape;
+            $count++;
 
-        $avgFirstSeason = 0;
-        for ($i = 0; $i < $L; $i++) $avgFirstSeason += $d[$i]['aktual'];
-        $avgFirstSeason /= $L;
-
-        $seasonals = [];
-        for ($i = 0; $i < $L; $i++) $seasonals[] = $d[$i]['aktual'] - $avgFirstSeason;
-
-        $currLevel = $avgFirstSeason;
-        $currTrend = 0;
-
-        if ($nData >= 2 * $L) {
-            $sumSecond = 0;
-            for ($i = $L; $i < 2 * $L; $i++) $sumSecond += $d[$i]['aktual'];
-            $currTrend = ($sumSecond / $L - $avgFirstSeason) / $L;
-        }
-
-        $seasonal_indices = $seasonals;
-        $table            = [];
-
-        // Periode inisialisasi
-        for ($i = 0; $i < $L; $i++) {
-            $table[] = [
-                'bulan_tahun' => $d[$i]['bulan_tahun'],
-                'aktual'      => $d[$i]['aktual'],
-                'prediksi'    => '-',
-                'error'       => '-',
-            ];
-        }
-
-        $total_error_abs = 0;
-        $total_error_sqr = 0;
-        $total_ape       = 0;
-        $count_error     = 0;
-
-        // Iterasi TES
-        for ($i = $L; $i < $nData; $i++) {
-            $prevLevel    = $currLevel;
-            $prevTrend    = $currTrend;
-            $prevSeasonal = $seasonal_indices[$i - $L];
-
-            $prediksi  = round($prevLevel + $prevTrend + $prevSeasonal, 2);
-            $aktual    = $d[$i]['aktual'];
-            $error_abs = abs($aktual - $prediksi);
-
-            $total_error_abs += $error_abs;
-            $total_error_sqr += pow($error_abs, 2);
-            $total_ape       += ($aktual != 0) ? ($error_abs / $aktual) * 100 : 0;
-            $count_error++;
-
-            $newLevel    = $alpha * ($aktual - $prevSeasonal)  + (1 - $alpha) * ($prevLevel + $prevTrend);
-            $newTrend    = $beta  * ($newLevel - $prevLevel)   + (1 - $beta)  * $prevTrend;
-            $newSeasonal = $gamma * ($aktual - $newLevel)      + (1 - $gamma) * $prevSeasonal;
-
-            $currLevel          = $newLevel;
-            $currTrend          = $newTrend;
-            $seasonal_indices[] = $newSeasonal;
-
-            $table[] = [
-                'bulan_tahun' => $d[$i]['bulan_tahun'],
+            $resultTable[] = [
+                'bulan_tahun' => $labels[$i],
                 'aktual'      => $aktual,
-                'prediksi'    => $prediksi,
-                'error'       => number_format($error_abs, 2),
+                'level'       => round($L, 4),
+                'trend'       => round($b, 4),
+                'seasonal'    => round($S[$i % $s], 4),
+                'prediksi'    => round($Ft_raw, 2), // round hanya untuk tampilan
+                'error'       => round($err, 4),
+                'error_sqr'   => round($err ** 2, 4),
+                'ape'         => round($ape, 4),
             ];
         }
 
-        $mad  = ($count_error > 0) ? round($total_error_abs / $count_error, 2) : 0;
-        $mse  = ($count_error > 0) ? round($total_error_sqr / $count_error, 2) : 0;
-        $mape = ($count_error > 0) ? round($total_ape / $count_error, 2) : 0;
+        // Hitung metrik akurasi
+        $mad  = $count > 0 ? round($totalMad  / $count, 4) : 0;
+        $mse  = $count > 0 ? round($totalMse  / $count, 4) : 0;
+        $mape = $count > 0 ? round($totalMape / $count, 4) : 0;
 
-        // Prediksi masa depan
-        $lastMonth = $d[$nData - 1]['bulan'];
-        $lastYear  = $d[$nData - 1]['tahun'];
+        // ===== TAHAP 4: FORECAST KE DEPAN =====
+        $lastBulan = $bulanData[$n - 1]['bulan'];
+        $lastTahun = $bulanData[$n - 1]['tahun'];
 
         for ($h = 1; $h <= $durasi; $h++) {
-            $lastMonth++;
-            if ($lastMonth > 12) { $lastMonth = 1; $lastYear++; }
+            $lastBulan++;
+            if ($lastBulan > 12) { $lastBulan = 1; $lastTahun++; }
 
-            $s_idx = ($nData + $h - 1) - $L;
-            while ($s_idx >= count($seasonal_indices)) $s_idx -= $L;
-            if ($s_idx < 0) $s_idx = ($s_idx % $L + $L) % $L;
+            $idx = ($n - $s + $h - 1) % $s;
+            $Ft  = $L + $b * $h + $S[$idx];
+            $Ft  = round(max(0, $Ft), 2);
 
-            $predFuture = round(($currLevel + $h * $currTrend) + $seasonal_indices[$s_idx], 2);
-
-            $table[] = [
-                'bulan_tahun' => $this->getMonthName($lastMonth) . ' ' . $lastYear,
+            $resultTable[] = [
+                'bulan_tahun' => $this->getMonthName($lastBulan) . ' ' . $lastTahun,
                 'aktual'      => '-',
-                'prediksi'    => $predFuture,
+                'level'       => '-',
+                'trend'       => '-',
+                'seasonal'    => '-',
+                'prediksi'    => $Ft,
                 'error'       => '-',
+                'error_sqr'   => '-',
+                'ape'         => '-',
             ];
         }
 
         return [
-            'table'   => $table,
-            'metrics' => ['mad' => $mad, 'mse' => $mse, 'mape' => $mape],
+            'mad'          => $mad,
+            'mse'          => $mse,
+            'mape'         => $mape,
+            'result_table' => $resultTable,
         ];
     }
 
-    // =========================================================
-    // HELPER: Hitung SMA Periode 3 Bulan
-    // =========================================================
+    // ===== HITUNG SMA m=12 =====
+    // m=12 disesuaikan dengan seasonal period TES (12 bulan)
     private function calculateSMA(array $data, int $periode, int $durasi): array
     {
         $nData           = count($data);
@@ -379,11 +376,11 @@ class PerbandinganController extends Controller
             $predictions[] = $prediksi;
         }
 
-        $mad  = ($count_error > 0) ? round($total_error_abs / $count_error, 2) : 0;
-        $mse  = ($count_error > 0) ? round($total_error_sqr / $count_error, 2) : 0;
-        $mape = ($count_error > 0) ? round($total_ape / $count_error, 2) : 0;
+        $mad  = ($count_error > 0) ? round($total_error_abs / $count_error, 4) : 0;
+        $mse  = ($count_error > 0) ? round($total_error_sqr / $count_error, 4) : 0;
+        $mape = ($count_error > 0) ? round($total_ape       / $count_error, 4) : 0;
 
-        // Prediksi masa depan SMA (sliding window)
+        // Forecast ke depan menggunakan data aktual + prediksi sebelumnya
         $dataExtended = array_column($data, 'aktual');
 
         for ($j = 0; $j < $durasi; $j++) {
@@ -401,11 +398,8 @@ class PerbandinganController extends Controller
         ];
     }
 
-    // =========================================================
-    // HELPER: Nama Bulan
-    // =========================================================
     private function getMonthName(int $monthNum): string
     {
-        return \DateTime::createFromFormat('!m', $monthNum)->format('F');
+        return \DateTime::createFromFormat('!m', $monthNum)->format('M');
     }
 }

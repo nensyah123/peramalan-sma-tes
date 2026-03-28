@@ -4,261 +4,285 @@ namespace App\Http\Controllers;
 
 use App\Models\Kendaraan;
 use App\Models\PeramalanTes;
+use App\Models\TransaksiPenyewaan;
 use Illuminate\Http\Request;
-use App\Models\PemakaianKendaraan;
 use Barryvdh\DomPDF\Facade\Pdf;
 
 class PeramalanTesController extends Controller
 {
     public function index()
     {
-        $kendaraans = Kendaraan::all();
-        $riwayat    = PeramalanTes::with('kendaraan')->latest()->get();
-        return view('menu.peramalan_tes', compact('kendaraans', 'riwayat'));
+        $merks = Kendaraan::select('merk')->distinct()->orderBy('merk')->pluck('merk');
+        return view('menu.peramalan_tes', compact('merks'));
     }
 
-    // =========================================================
-    // HELPER: Hitung TES — hanya metrik (untuk Grid Search)
-    // =========================================================
-    private function hitungTESMetrik(array $d, float $alpha, float $beta, float $gamma, int $L): array
+    public function riwayat()
     {
-        $nData = count($d);
-        if ($nData < $L) return ['mape' => PHP_INT_MAX, 'mad' => PHP_INT_MAX, 'mse' => PHP_INT_MAX];
-
-        $avgFirstSeason = 0;
-        for ($i = 0; $i < $L; $i++) $avgFirstSeason += $d[$i]['aktual'];
-        $avgFirstSeason /= $L;
-
-        $seasonals = [];
-        for ($i = 0; $i < $L; $i++) $seasonals[] = $d[$i]['aktual'] - $avgFirstSeason;
-
-        $currLevel = $avgFirstSeason;
-        $currTrend = 0;
-
-        if ($nData >= 2 * $L) {
-            $sumSecond = 0;
-            for ($i = $L; $i < 2 * $L; $i++) $sumSecond += $d[$i]['aktual'];
-            $currTrend = ($sumSecond / $L - $avgFirstSeason) / $L;
-        }
-
-        $seasonal_indices = $seasonals;
-        $total_error_abs  = 0;
-        $total_error_sqr  = 0;
-        $total_ape        = 0;
-        $count_error      = 0;
-
-        for ($i = $L; $i < $nData; $i++) {
-            $prevLevel    = $currLevel;
-            $prevTrend    = $currTrend;
-            $prevSeasonal = $seasonal_indices[$i - $L];
-
-            $prediksi  = $prevLevel + $prevTrend + $prevSeasonal;
-            $aktual    = $d[$i]['aktual'];
-            $error_abs = abs($aktual - $prediksi);
-
-            $total_error_abs += $error_abs;
-            $total_error_sqr += pow($error_abs, 2);
-            $total_ape       += ($aktual != 0) ? ($error_abs / $aktual) * 100 : 0;
-            $count_error++;
-
-            $newLevel    = $alpha * ($aktual - $prevSeasonal)  + (1 - $alpha) * ($prevLevel + $prevTrend);
-            $newTrend    = $beta  * ($newLevel - $prevLevel)   + (1 - $beta)  * $prevTrend;
-            $newSeasonal = $gamma * ($aktual - $newLevel)      + (1 - $gamma) * $prevSeasonal;
-
-            $currLevel          = $newLevel;
-            $currTrend          = $newTrend;
-            $seasonal_indices[] = $newSeasonal;
-        }
-
-        if ($count_error === 0) return ['mape' => PHP_INT_MAX, 'mad' => PHP_INT_MAX, 'mse' => PHP_INT_MAX];
-
-        return [
-            'mad'  => round($total_error_abs / $count_error, 2),
-            'mse'  => round($total_error_sqr / $count_error, 2),
-            'mape' => round($total_ape / $count_error, 2),
-        ];
+        $riwayat = PeramalanTes::latest()->get();
+        return view('menu.riwayat_tes', compact('riwayat'));
     }
 
-    // =========================================================
-    // HELPER: Grid Search — 729 kombinasi (0.1 s/d 0.9, step 0.1)
-    // Kriteria: MAPE terkecil
-    // =========================================================
-    private function gridSearch(array $d, int $L): array
+    // ===== PYTHON: HANYA UNTUK OPTIMASI α, β, γ =====
+    private function getOptimalParams(array $values): array
     {
-        $bestMape  = PHP_INT_MAX;
-        $bestAlpha = 0.1;
-        $bestBeta  = 0.1;
-        $bestGamma = 0.1;
+        $input = json_encode(['values' => $values]);
 
-        $steps = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9];
+        $tmpFile = storage_path('app/tes_input_' . time() . '.json');
+        file_put_contents($tmpFile, $input);
 
-        foreach ($steps as $alpha) {
-            foreach ($steps as $beta) {
-                foreach ($steps as $gamma) {
-                    $result = $this->hitungTESMetrik($d, $alpha, $beta, $gamma, $L);
-                    if ($result['mape'] < $bestMape) {
-                        $bestMape  = $result['mape'];
-                        $bestAlpha = $alpha;
-                        $bestBeta  = $beta;
-                        $bestGamma = $gamma;
-                    }
-                }
+        $scriptPath = base_path('tes_optimize.py');
+        $command    = "python \"$scriptPath\" \"$tmpFile\" 2>&1";
+        $outputRaw  = shell_exec($command);
+
+        @unlink($tmpFile);
+
+        $result = json_decode($outputRaw, true);
+
+        if (!$result || !isset($result['alpha'])) {
+            throw new \Exception('Gagal menjalankan Python: ' . $outputRaw);
+        }
+
+        return $result;
+    }
+
+    // ===== TAHAP 1: INISIALISASI MANUAL =====
+    private function hitungInisialisasi(array $values, int $s = 12): array
+    {
+        $n = count($values);
+
+        // Level awal = rata-rata 12 data pertama
+        $L0 = array_sum(array_slice($values, 0, $s)) / $s;
+
+        // Trend awal = rata-rata selisih antar musim / s
+        $trendSum   = 0;
+        $trendCount = 0;
+        for ($i = 0; $i < $s; $i++) {
+            if (($s + $i) < $n) {
+                $trendSum += ($values[$s + $i] - $values[$i]) / $s;
+                $trendCount++;
             }
         }
+        $b0 = $trendCount > 0 ? $trendSum / $trendCount : 0;
 
-        return [
-            'alpha' => $bestAlpha,
-            'beta'  => $bestBeta,
-            'gamma' => $bestGamma,
-        ];
+        // Seasonal awal = Yk - L0
+        $S0 = [];
+        for ($i = 0; $i < $s; $i++) {
+            $S0[$i] = $values[$i] - $L0;
+        }
+
+        return ['L0' => $L0, 'b0' => $b0, 'S0' => $S0];
     }
 
-    // =========================================================
-    // PROCESS: Main forecasting TES dengan parameter Grid Search
-    // =========================================================
-    public function process(Request $request)
-    {
-        $request->validate([
-            'id_kendaraan'    => 'required|exists:kendaraan,id',
-            'durasi_prediksi' => 'required|integer|min:1',
-        ]);
+    // ===== TAHAP 2 & 3: ITERASI + FORECAST MANUAL =====
+    private function hitungTESManual(
+        array $values,
+        array $labels,
+        array $bulanData,
+        float $alpha,
+        float $beta,
+        float $gamma,
+        int   $durasi,
+        int   $s = 12
+    ): array {
+        $n = count($values);
 
-        $id_kendaraan = $request->id_kendaraan;
-        $durasi       = $request->durasi_prediksi;
-        $L            = 12;
+        // Inisialisasi
+        $init = $this->hitungInisialisasi($values, $s);
+        $L    = $init['L0'];
+        $b    = $init['b0'];
+        $S    = $init['S0'];
 
-        $dataPemakaian = PemakaianKendaraan::where('id_kendaraan', $id_kendaraan)
-            ->orderBy('tahun', 'asc')
-            ->orderBy('bulan', 'asc')
-            ->get();
+        $resultTable = [];
+        $totalMad    = 0;
+        $totalMse    = 0;
+        $totalMape   = 0;
+        $count       = 0;
 
-        if ($dataPemakaian->count() < $L) {
-            return back()->with('error', 'Data historis harus minimal ' . $L . ' bulan untuk metode TES (Musiman Tahunan).');
-        }
+        for ($i = 0; $i < $n; $i++) {
+            $aktual = $values[$i];
 
-        $d = [];
-        foreach ($dataPemakaian as $pem) {
-            $d[] = [
-                'bulan'       => $pem->bulan,
-                'tahun'       => $pem->tahun,
-                'aktual'      => $pem->jumlah_transaksi,
-                'bulan_tahun' => $this->getMonthName($pem->bulan) . ' ' . $pem->tahun,
-            ];
-        }
+            // Baris 1-11: kosong semua (periode inisialisasi)
+            if ($i < 11) {
+                $resultTable[] = [
+                    'bulan_tahun' => $labels[$i],
+                    'aktual'      => $aktual,
+                    'level'       => '-',
+                    'trend'       => '-',
+                    'seasonal'    => '-',
+                    'prediksi'    => '-',
+                    'error'       => '-',
+                    'error_sqr'   => '-',
+                    'ape'         => '-',
+                ];
+                continue;
+            }
 
-        // ---- GRID SEARCH: 729 kombinasi ----
-        $optimal = $this->gridSearch($d, $L);
-        $alpha   = $optimal['alpha'];
-        $beta    = $optimal['beta'];
-        $gamma   = $optimal['gamma'];
+            // Baris 12 (Des): tampilkan nilai awal inisialisasi
+            if ($i === 11) {
+                $resultTable[] = [
+                    'bulan_tahun' => $labels[$i],
+                    'aktual'      => $aktual,
+                    'level'       => round($L, 4),
+                    'trend'       => round($b, 4),
+                    'seasonal'    => round($S[11], 4),
+                    'prediksi'    => '-',
+                    'error'       => '-',
+                    'error_sqr'   => '-',
+                    'ape'         => '-',
+                ];
+                continue;
+            }
 
-        // ---- HITUNG TES DENGAN PARAMETER OPTIMAL ----
-        $nData = count($d);
+            // Baris 13+: iterasi menggunakan rumus Holt-Winters
+            $St_s = $S[$i % $s];
 
-        $avgFirstSeason = 0;
-        for ($i = 0; $i < $L; $i++) $avgFirstSeason += $d[$i]['aktual'];
-        $avgFirstSeason /= $L;
+            // Forecast periode ini
+            $Ft = $L + $b + $St_s;
+            $Ft = round($Ft, 2);
 
-        $seasonals = [];
-        for ($i = 0; $i < $L; $i++) $seasonals[] = $d[$i]['aktual'] - $avgFirstSeason;
+            // Update Level
+            $L_new = $alpha * ($aktual - $St_s) + (1 - $alpha) * ($L + $b);
 
-        $currLevel = $avgFirstSeason;
-        $currTrend = 0;
+            // Update Trend
+            $b_new = $beta * ($L_new - $L) + (1 - $beta) * $b;
 
-        if ($nData >= 2 * $L) {
-            $sumSecond = 0;
-            for ($i = $L; $i < 2 * $L; $i++) $sumSecond += $d[$i]['aktual'];
-            $currTrend = ($sumSecond / $L - $avgFirstSeason) / $L;
-        }
+            // Update Seasonal
+            $S[$i % $s] = $gamma * ($aktual - $L_new) + (1 - $gamma) * $St_s;
 
-        $seasonal_indices = $seasonals;
-        $resultTable      = [];
+            $L = $L_new;
+            $b = $b_new;
 
-        for ($i = 0; $i < $L; $i++) {
-            $resultTable[] = [
-                'bulan_tahun' => $d[$i]['bulan_tahun'],
-                'aktual'      => $d[$i]['aktual'],
-                'level'       => '-',
-                'trend'       => '-',
-                'seasonal'    => round($seasonal_indices[$i], 3),
-                'prediksi'    => '-',
-                'error'       => '-',
-                'error_sqr'   => '-',
-                'ape'         => '-',
-            ];
-        }
+            // Hitung Error
+            $err = abs($aktual - $Ft);
+            $ape = $aktual != 0 ? ($err / $aktual) * 100 : 0;
 
-        $total_error_abs = 0;
-        $total_error_sqr = 0;
-        $total_ape       = 0;
-        $count_error     = 0;
-
-        for ($i = $L; $i < $nData; $i++) {
-            $prevLevel    = $currLevel;
-            $prevTrend    = $currTrend;
-            $prevSeasonal = $seasonal_indices[$i - $L];
-
-            $prediksi  = round($prevLevel + $prevTrend + $prevSeasonal, 2);
-            $aktual    = $d[$i]['aktual'];
-            $error_abs = abs($aktual - $prediksi);
-            $error_sqr = pow($error_abs, 2);
-            $ape       = ($aktual != 0) ? ($error_abs / $aktual) * 100 : 0;
-
-            $total_error_abs += $error_abs;
-            $total_error_sqr += $error_sqr;
-            $total_ape       += $ape;
-            $count_error++;
-
-            $newLevel    = $alpha * ($aktual - $prevSeasonal)  + (1 - $alpha) * ($prevLevel + $prevTrend);
-            $newTrend    = $beta  * ($newLevel - $prevLevel)   + (1 - $beta)  * $prevTrend;
-            $newSeasonal = $gamma * ($aktual - $newLevel)      + (1 - $gamma) * $prevSeasonal;
-
-            $currLevel          = $newLevel;
-            $currTrend          = $newTrend;
-            $seasonal_indices[] = $newSeasonal;
+            $totalMad  += $err;
+            $totalMse  += $err ** 2;
+            $totalMape += $ape;
+            $count++;
 
             $resultTable[] = [
-                'bulan_tahun' => $d[$i]['bulan_tahun'],
+                'bulan_tahun' => $labels[$i],
                 'aktual'      => $aktual,
-                'level'       => round($newLevel, 2),
-                'trend'       => round($newTrend, 2),
-                'seasonal'    => round($newSeasonal, 3),
-                'prediksi'    => $prediksi,
-                'error'       => number_format($error_abs, 2),
-                'error_sqr'   => number_format($error_sqr, 2),
-                'ape'         => number_format($ape, 2),
+                'level'       => round($L, 4),
+                'trend'       => round($b, 4),
+                'seasonal'    => round($S[$i % $s], 4),
+                'prediksi'    => $Ft,
+                'error'       => round($err,      4),
+                'error_sqr'   => round($err ** 2, 4),
+                'ape'         => round($ape,      4),
             ];
         }
 
-        $mad  = ($count_error > 0) ? round($total_error_abs / $count_error, 2) : 0;
-        $mse  = ($count_error > 0) ? round($total_error_sqr / $count_error, 2) : 0;
-        $mape = ($count_error > 0) ? round($total_ape / $count_error, 2) : 0;
+        // Hitung metrik akurasi
+        $mad  = $count > 0 ? round($totalMad  / $count, 4) : 0;
+        $mse  = $count > 0 ? round($totalMse  / $count, 4) : 0;
+        $mape = $count > 0 ? round($totalMape / $count, 4) : 0;
 
-        $lastMonth = $d[$nData - 1]['bulan'];
-        $lastYear  = $d[$nData - 1]['tahun'];
+        // ===== TAHAP 4: FORECAST KE DEPAN =====
+        $lastBulan = $bulanData[$n - 1]['bulan'];
+        $lastTahun = $bulanData[$n - 1]['tahun'];
 
         for ($h = 1; $h <= $durasi; $h++) {
-            $lastMonth++;
-            if ($lastMonth > 12) { $lastMonth = 1; $lastYear++; }
+            $lastBulan++;
+            if ($lastBulan > 12) { $lastBulan = 1; $lastTahun++; }
 
-            $s_idx = ($nData + $h - 1) - $L;
-            while ($s_idx >= count($seasonal_indices)) $s_idx -= $L;
-            if ($s_idx < 0) $s_idx = ($s_idx % $L + $L) % $L;
-
-            $predFuture = round(($currLevel + $h * $currTrend) + $seasonal_indices[$s_idx], 2);
+            $idx = ($n - $s + $h - 1) % $s;
+            $Ft  = $L + $b * $h + $S[$idx];
+            $Ft  = round(max(0, $Ft), 2);
 
             $resultTable[] = [
-                'bulan_tahun' => $this->getMonthName($lastMonth) . ' ' . $lastYear,
+                'bulan_tahun' => $this->getMonthName($lastBulan) . ' ' . $lastTahun,
                 'aktual'      => '-',
                 'level'       => '-',
                 'trend'       => '-',
                 'seasonal'    => '-',
-                'prediksi'    => $predFuture,
+                'prediksi'    => $Ft,
                 'error'       => '-',
                 'error_sqr'   => '-',
                 'ape'         => '-',
             ];
         }
+
+        return [
+            'mad'          => $mad,
+            'mse'          => $mse,
+            'mape'         => $mape,
+            'result_table' => $resultTable,
+        ];
+    }
+
+    public function process(Request $request)
+    {
+        $request->validate([
+            'merk'            => 'required|string',
+            'durasi_prediksi' => 'required|integer|min:1',
+        ]);
+
+        $merk   = $request->merk;
+        $durasi = (int) $request->durasi_prediksi;
+        $s      = 12;
+
+        $ids = Kendaraan::where('merk', $merk)->pluck('id');
+
+        if ($ids->isEmpty()) {
+            return back()->with('error', 'Merk kendaraan tidak ditemukan.');
+        }
+
+        // Exclude bulan berjalan
+        $bulanSekarang = (int) date('m');
+        $tahunSekarang = (int) date('Y');
+
+        $raw = TransaksiPenyewaan::selectRaw('MONTH(tgl_pinjam) as bulan, YEAR(tgl_pinjam) as tahun, COUNT(*) as total')
+            ->whereIn('id_kendaraan', $ids)
+            ->where(function($query) use ($bulanSekarang, $tahunSekarang) {
+                $query->whereYear('tgl_pinjam', '<', $tahunSekarang)
+                      ->orWhere(function($q) use ($bulanSekarang, $tahunSekarang) {
+                          $q->whereYear('tgl_pinjam', '=', $tahunSekarang)
+                            ->whereMonth('tgl_pinjam', '<', $bulanSekarang);
+                      });
+            })
+            ->groupBy('tahun', 'bulan')
+            ->orderBy('tahun', 'asc')
+            ->orderBy('bulan', 'asc')
+            ->get();
+
+        if ($raw->count() < $s) {
+            return back()->with('error', 'Data historis harus minimal ' . $s . ' bulan untuk metode TES.');
+        }
+
+        $values    = [];
+        $labels    = [];
+        $bulanData = [];
+
+        foreach ($raw as $row) {
+            $values[]    = (float) $row->total;
+            $labels[]    = $this->getMonthName((int)$row->bulan) . ' ' . $row->tahun;
+            $bulanData[] = ['bulan' => (int)$row->bulan, 'tahun' => (int)$row->tahun];
+        }
+
+        // ===== STEP 1: Dapatkan α, β, γ optimal dari Python =====
+        try {
+            $params = $this->getOptimalParams($values);
+        } catch (\Exception $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        $alpha = $params['alpha'];
+        $beta  = $params['beta'];
+        $gamma = $params['gamma'];
+
+        // ===== STEP 2: Hitung semua tahap manual di PHP =====
+        $result = $this->hitungTESManual(
+            $values, $labels, $bulanData,
+            $alpha, $beta, $gamma,
+            $durasi, $s
+        );
+
+        $mad         = $result['mad'];
+        $mse         = $result['mse'];
+        $mape        = $result['mape'];
+        $resultTable = $result['result_table'];
 
         $chartLabels   = [];
         $actualData    = [];
@@ -266,27 +290,26 @@ class PeramalanTesController extends Controller
 
         foreach ($resultTable as $row) {
             $chartLabels[]   = $row['bulan_tahun'];
-            $actualData[]    = ($row['aktual'] !== '-' && $row['aktual'] !== null) ? $row['aktual'] : null;
-            $predictedData[] = ($row['prediksi'] !== '-' && $row['prediksi'] !== null) ? $row['prediksi'] : null;
+            $actualData[]    = ($row['aktual'] !== '-') ? (int) $row['aktual'] : null;
+            $predictedData[] = ($row['prediksi'] !== '-') ? (float) $row['prediksi'] : null;
         }
 
-        $kendaraans = Kendaraan::all();
-        $riwayat    = PeramalanTes::with('kendaraan')->latest()->get();
+        $merks = Kendaraan::select('merk')->distinct()->orderBy('merk')->pluck('merk');
 
         return view('menu.peramalan_tes', compact(
-            'kendaraans', 'riwayat',
+            'merks',
             'mad', 'mse', 'mape',
             'chartLabels', 'actualData', 'predictedData',
             'resultTable',
-            'id_kendaraan', 'durasi',
+            'merk', 'durasi',
             'alpha', 'beta', 'gamma'
-        ))->with('showResult', true)->with('input', $request->all());
+        ))->with('showResult', true);
     }
 
     public function store(Request $request)
     {
         $request->validate([
-            'id_kendaraan'    => 'required',
+            'merk'            => 'required|string',
             'alpha'           => 'required',
             'beta'            => 'required',
             'gamma'           => 'required',
@@ -298,7 +321,7 @@ class PeramalanTesController extends Controller
         ]);
 
         PeramalanTes::create([
-            'id_kendaraan'    => $request->id_kendaraan,
+            'merk'            => $request->merk,
             'alfa'            => $request->alpha,
             'beta'            => $request->beta,
             'gamma'           => $request->gamma,
@@ -309,23 +332,30 @@ class PeramalanTesController extends Controller
             'data_peramalan'  => json_decode($request->data_peramalan, true),
         ]);
 
-        return redirect()->route('peramalan_tes.index')->with('success', 'Hasil peramalan TES berhasil disimpan.');
+        return redirect()->route('peramalan_tes.riwayat')
+            ->with('success', 'Hasil peramalan TES berhasil disimpan.');
     }
 
     public function destroy($id)
     {
         PeramalanTes::findOrFail($id)->delete();
-        return redirect()->route('peramalan_tes.index')->with('success', 'Riwayat peramalan berhasil dihapus.');
+        return redirect()->route('peramalan_tes.riwayat')
+            ->with('success', 'Riwayat peramalan berhasil dihapus.');
     }
 
     private function getMonthName($monthNum)
     {
-        return \DateTime::createFromFormat('!m', $monthNum)->format('F');
+        return \DateTime::createFromFormat('!m', $monthNum)->format('M');
     }
 
     public function exportPdf($id)
     {
-        $peramalan = PeramalanTes::with('kendaraan')->findOrFail($id);
+        $peramalan = PeramalanTes::findOrFail($id);
+
+        $data = $peramalan->data_peramalan;
+        if (is_string($data)) $data = json_decode($data, true);
+        $table = is_array($data) ? $data : [];
+        if (isset($data['table'])) $table = $data['table'];
 
         $metrics = [
             'mad'  => $peramalan->mad,
@@ -333,35 +363,29 @@ class PeramalanTesController extends Controller
             'mape' => $peramalan->mape,
         ];
 
-        $data = $peramalan->data_peramalan;
-        if (is_string($data)) $data = json_decode($data, true);
-
-        $table = is_array($data) ? $data : [];
-        if (isset($data['table'])) $table = $data['table'];
-
         $labels = []; $actuals = []; $predicteds = [];
         foreach ($table as $row) {
             $labels[]     = $row['bulan_tahun'];
-            $actuals[]    = ($row['aktual'] !== '-' && $row['aktual'] !== null) ? $row['aktual'] : null;
-            $predicteds[] = ($row['prediksi'] !== '-' && $row['prediksi'] !== null) ? $row['prediksi'] : null;
+            $actuals[]    = ($row['aktual'] !== '-') ? $row['aktual'] : null;
+            $predicteds[] = ($row['prediksi'] !== '-') ? $row['prediksi'] : null;
         }
 
         $allValues = array_merge(
-            array_filter($actuals, fn($v) => $v !== null),
+            array_filter($actuals,    fn($v) => $v !== null),
             array_filter($predicteds, fn($v) => $v !== null)
         );
-        $minY    = empty($allValues) ? 0 : min($allValues);
+        $minY    = empty($allValues) ? 0   : min($allValues);
         $maxY    = empty($allValues) ? 100 : max($allValues);
         $padding = ($maxY - $minY) * 0.1 ?: 10;
         $minY    = max(0, $minY - $padding);
         $maxY   += $padding;
 
-        $svgWidth    = 1000; $svgHeight    = 300;
-        $paddingLeft = 50;   $paddingBottom = 30;
-        $graphWidth  = $svgWidth - $paddingLeft;
-        $graphHeight = $svgHeight - $paddingBottom;
-        $count       = count($labels);
-        $stepX       = $graphWidth / max(1, $count - 1);
+        $svgWidth     = 1000; $svgHeight     = 300;
+        $paddingLeft  = 50;   $paddingBottom = 30;
+        $graphWidth   = $svgWidth  - $paddingLeft;
+        $graphHeight  = $svgHeight - $paddingBottom;
+        $count        = count($labels);
+        $stepX        = $graphWidth / max(1, $count - 1);
 
         $getY = function ($val) use ($graphHeight, $minY, $maxY) {
             if ($val === null) return null;
@@ -372,37 +396,33 @@ class PeramalanTesController extends Controller
         $actualPoints = []; $predictedPoints = [];
         foreach ($labels as $i => $label) {
             $x     = $paddingLeft + ($i * $stepX);
-            $yAct  = $getY($actuals[$i] ?? null);
-            if ($yAct !== null) $actualPoints[] = "$x,$yAct";
+            $yAct  = $getY($actuals[$i]    ?? null);
+            if ($yAct  !== null) $actualPoints[]    = "$x,$yAct";
             $yPred = $getY($predicteds[$i] ?? null);
             if ($yPred !== null) $predictedPoints[] = "$x,$yPred";
         }
 
-        $svgContent  = '<svg width="' . $svgWidth . '" height="' . $svgHeight . '" viewBox="0 0 ' . $svgWidth . ' ' . $svgHeight . '" xmlns="http://www.w3.org/2000/svg">';
-        $svgContent .= '<rect x="0" y="0" width="' . $svgWidth . '" height="' . $svgHeight . '" fill="none" stroke="#f0f0f0" stroke-width="1" />';
-
+        $svgContent  = '<svg width="'.$svgWidth.'" height="'.$svgHeight.'" xmlns="http://www.w3.org/2000/svg">';
+        $svgContent .= '<rect x="0" y="0" width="'.$svgWidth.'" height="'.$svgHeight.'" fill="none" stroke="#f0f0f0" stroke-width="1"/>';
         for ($i = 0; $i <= 4; $i++) {
             $y   = ($svgHeight - $paddingBottom) - ($i * ($svgHeight - $paddingBottom - 20) / 4);
             $val = $minY + ($i * ($maxY - $minY) / 4);
-            $svgContent .= '<line x1="' . $paddingLeft . '" y1="' . $y . '" x2="' . $svgWidth . '" y2="' . $y . '" stroke="#e6e6e6" stroke-width="1" stroke-dasharray="4" />';
-            $svgContent .= '<text x="' . ($paddingLeft - 5) . '" y="' . ($y + 3) . '" font-family="sans-serif" font-size="10" fill="#888" text-anchor="end">' . number_format($val, 0) . '</text>';
+            $svgContent .= '<line x1="'.$paddingLeft.'" y1="'.$y.'" x2="'.$svgWidth.'" y2="'.$y.'" stroke="#e6e6e6" stroke-width="1" stroke-dasharray="4"/>';
+            $svgContent .= '<text x="'.($paddingLeft-5).'" y="'.($y+3).'" font-size="10" fill="#888" text-anchor="end">'.number_format($val,0).'</text>';
         }
-
-        $svgContent .= '<polyline points="' . implode(' ', $actualPoints) . '" fill="none" stroke="#4e73df" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />';
-        $svgContent .= '<polyline points="' . implode(' ', $predictedPoints) . '" fill="none" stroke="#1cc88a" stroke-width="2" stroke-dasharray="5,5" stroke-linecap="round" stroke-linejoin="round"/>';
-
+        $svgContent .= '<polyline points="'.implode(' ',$actualPoints).'"    fill="none" stroke="#4e73df" stroke-width="2"/>';
+        $svgContent .= '<polyline points="'.implode(' ',$predictedPoints).'" fill="none" stroke="#1cc88a" stroke-width="2" stroke-dasharray="5,5"/>';
         $skip = ($count > 12) ? ceil($count / 12) : 1;
         foreach ($labels as $i => $label) {
             $x = $paddingLeft + ($i * $stepX);
             if ($i == 0 || $i == $count - 1 || $i % $skip == 0) {
-                $svgContent .= '<text x="' . $x . '" y="' . ($svgHeight - 10) . '" font-family="sans-serif" font-size="9" fill="#666" text-anchor="middle">' . $label . '</text>';
+                $svgContent .= '<text x="'.$x.'" y="'.($svgHeight-10).'" font-size="9" fill="#666" text-anchor="middle">'.$label.'</text>';
             }
         }
-
-        $svgContent .= '<rect x="' . ($svgWidth - 150) . '" y="10" width="10" height="10" fill="#4e73df" />';
-        $svgContent .= '<text x="' . ($svgWidth - 135) . '" y="19" font-family="sans-serif" font-size="11" fill="#333">Data Aktual</text>';
-        $svgContent .= '<rect x="' . ($svgWidth - 70) . '" y="10" width="10" height="10" fill="none" stroke="#1cc88a" stroke-width="2" stroke-dasharray="4" />';
-        $svgContent .= '<text x="' . ($svgWidth - 55) . '" y="19" font-family="sans-serif" font-size="11" fill="#333">Prediksi</text>';
+        $svgContent .= '<rect x="'.($svgWidth-150).'" y="10" width="10" height="10" fill="#4e73df"/>';
+        $svgContent .= '<text x="'.($svgWidth-135).'" y="19" font-size="11" fill="#333">Data Aktual</text>';
+        $svgContent .= '<rect x="'.($svgWidth-70).'"  y="10" width="10" height="10" fill="none" stroke="#1cc88a" stroke-width="2" stroke-dasharray="4"/>';
+        $svgContent .= '<text x="'.($svgWidth-55).'"  y="19" font-size="11" fill="#333">Prediksi</text>';
         $svgContent .= '</svg>';
 
         $chartImage = 'data:image/svg+xml;base64,' . base64_encode($svgContent);

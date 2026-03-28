@@ -5,7 +5,7 @@
         <img src="{{ url('/template/img/logorental.png') }}" alt="MSJ Trans">
     </div>
 
-    <!-- Dashboard -->
+    <!-- MAIN -->
     <div class="sidebar-section-label">Main</div>
 
     <li class="nav-item {{ Request::is('/') ? 'active' : '' }}">
@@ -17,69 +17,49 @@
 
     <hr class="sidebar-divider">
 
-    <!-- Management -->
-    <div class="sidebar-section-label">Management</div>
+    <!-- ARMADA -->
+    <div class="sidebar-section-label">Armada</div>
 
-    <li class="nav-item {{ Request::is('management-kendaraan*') || Request::is('input-data*') ? 'active' : '' }}">
-        <a class="nav-link {{ Request::is('management-kendaraan*') || Request::is('input-data*') ? '' : 'collapsed' }}"
-           href="#"
-           data-toggle="collapse"
-           data-target="#collapseManagement">
-            <i class="fas fa-fw fa-folder"></i>
-            <span>Management Data</span>
+    <li class="nav-item {{ Request::is('management-kendaraan*') ? 'active' : '' }}">
+        <a class="nav-link" href="{{ url('/management-kendaraan') }}">
+            <i class="fas fa-fw fa-car"></i>
+            <span>Daftar Kendaraan</span>
         </a>
-
-        <div id="collapseManagement"
-             class="collapse {{ Request::is('management-kendaraan*') || Request::is('input-data*') ? 'show' : '' }}"
-             data-parent="#accordionSidebar">
-            <div class="collapse-inner">
-                <a class="collapse-item {{ Request::is('management-kendaraan*') ? 'active' : '' }}"
-                   href="{{ url('/management-kendaraan') }}">
-                    <i class="fas fa-fw fa-car"></i> Daftar Kendaraan
-                </a>
-                <a class="collapse-item {{ Request::is('input-data*') ? 'active' : '' }}"
-                   href="{{ url('/input-data') }}">
-                    <i class="fas fa-fw fa-list"></i> Daftar Transaksi
-                </a>
-            </div>
-        </div>
     </li>
 
     <hr class="sidebar-divider">
 
-    <!-- Peramalan -->
+    <!-- PENYEWAAN -->
+    <div class="sidebar-section-label">Penyewaan</div>
+
+    <li class="nav-item {{ Request::is('transaksi-penyewaan*') ? 'active' : '' }}">
+        <a class="nav-link" href="{{ url('/transaksi-penyewaan') }}">
+            <i class="fas fa-fw fa-exchange-alt"></i>
+            <span>Transaksi Penyewaan</span>
+        </a>
+    </li>
+
+    <hr class="sidebar-divider">
+
+    <!-- PERAMALAN -->
     <div class="sidebar-section-label">Peramalan</div>
 
-    <li class="nav-item {{ Request::is('peramalan-tes*') ? 'active' : '' }}">
-        <a class="nav-link {{ Request::is('peramalan-tes*') ? '' : 'collapsed' }}"
-           href="#"
-           data-toggle="collapse"
-           data-target="#collapsePeramalan">
-            <i class="fas fa-fw fa-chart-line"></i>
-            <span>Metode Peramalan</span>
+    <li class="nav-item {{ Request::is('peramalan-tes') && !Request::is('peramalan-tes/riwayat') ? 'active' : '' }}">
+        <a class="nav-link" href="{{ url('/peramalan-tes') }}">
+            <i class="fas fa-fw fa-wave-square"></i>
+            <span>Triple Exp. Smoothing</span>
         </a>
-
-        <div id="collapsePeramalan"
-             class="collapse {{ Request::is('peramalan-tes*') ? 'show' : '' }}"
-             data-parent="#accordionSidebar">
-            <div class="collapse-inner">
-                <a class="collapse-item {{ Request::is('peramalan-tes*') ? 'active' : '' }}"
-                   href="{{ url('/peramalan-tes') }}">
-                    <i class="fas fa-fw fa-wave-square"></i> Triple Exp. Smoothing
-                </a>
-            </div>
-        </div>
     </li>
 
     <hr class="sidebar-divider">
 
-    <!-- Hasil -->
-    <div class="sidebar-section-label">Hasil</div>
+    <!-- RIWAYAT -->
+    <div class="sidebar-section-label">Riwayat</div>
 
-    <li class="nav-item {{ Request::is('analisis-armada*') ? 'active' : '' }}">
-        <a class="nav-link" href="{{ url('/analisis-armada') }}">
-            <i class="fas fa-fw fa-chart-bar"></i>
-            <span>Analisis Armada</span>
+    <li class="nav-item {{ Request::is('peramalan-tes/riwayat') ? 'active' : '' }}">
+        <a class="nav-link" href="{{ url('/peramalan-tes/riwayat') }}">
+            <i class="fas fa-fw fa-history"></i>
+            <span>Riwayat Peramalan</span>
         </a>
     </li>
 

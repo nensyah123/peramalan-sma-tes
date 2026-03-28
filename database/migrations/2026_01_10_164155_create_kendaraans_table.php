@@ -6,26 +6,18 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('kendaraan', function (Blueprint $table) {
             $table->engine = 'InnoDB';
-            $table->charset = 'armscii8';
-            $table->collation = 'armscii8_general_ci';
-
             $table->id();
-            $table->string('nama_kendaraan', 255);
-            $table->integer('unit')->default(0);
+            $table->string('merk', 100);
+            $table->string('plat', 20)->nullable();
+            $table->enum('status', ['Tersedia', 'Disewa', 'Rusak', 'Dijual'])->default('Tersedia');
             $table->timestamps();
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('kendaraan');

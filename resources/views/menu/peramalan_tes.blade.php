@@ -2,513 +2,344 @@
 
 @section('content')
 
-@if(session('success'))
-<div class="alert alert-success alert-dismissible fade show" role="alert" id="success-alert">
-  {{ session('success') }}
-  <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-    <span aria-hidden="true">&times;</span>
-  </button>
+@if(session('error'))
+<div class="alert alert-danger alert-dismissible fade show">
+    <i class="fas fa-exclamation-circle mr-2"></i>{{ session('error') }}
+    <button type="button" class="close" data-dismiss="alert"><span>&times;</span></button>
 </div>
-<script>
-  setTimeout(function() {
-    var alert = document.getElementById('success-alert');
-    if (alert) { alert.classList.remove('show'); setTimeout(function() { alert.remove(); }, 150); }
-  }, 3000);
-</script>
 @endif
 
-<div class="row">
-    <div class="col-xl-12 col-lg-12 mb-4">
-        <div class="card shadow h-100">
-            <div class="card-header py-3">
-                <h6 class="m-0 font-weight-bold text-primary">Form Peramalan TES</h6>
-            </div>
-            <div class="card-body">
-                <form action="{{ route('peramalan_tes.process') }}" method="POST">
-                    @csrf
-                    <div class="form-row">
-                        <div class="form-group col-md-4">
-                            <label for="id_kendaraan">Pilih Kendaraan</label>
-                            <select class="form-control" id="id_kendaraan" name="id_kendaraan" required>
-                                <option value="">-- Pilih Kendaraan --</option>
-                                @foreach($kendaraans as $k)
-                                    <option value="{{ $k->id }}">{{ $k->nama_kendaraan }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div class="form-group col-md-4">
-                            <label for="durasi_prediksi">Jumlah Periode Prediksi</label>
-                            <input type="number" class="form-control" id="durasi_prediksi" name="durasi_prediksi" placeholder="Contoh: 12" required>
-                        </div>
-                    </div>
-                    <small class="form-text text-muted mb-2">
-                        <i class="fas fa-info-circle"></i>
-                        Parameter Alpha, Beta, dan Gamma dicari otomatis
-                    </small>
-                    <button type="submit" class="btn btn-primary btn-block">Proses Peramalan</button>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
+<div class="card shadow-sm border-0 mb-4" style="border-radius:14px;">
+    <div class="card-body p-4">
 
-<!-- Result Card -->
-@if(isset($showResult) && $showResult)
-<div class="row" id="result-card">
-    <div class="col-xl-12 col-lg-12 mb-4">
-        <div class="card shadow h-100">
-            <div class="card-header py-3">
-                <h6 class="m-0 font-weight-bold text-primary">Hasil Prediksi TES</h6>
-            </div>
-            <div class="card-body">
+        <form action="{{ route('peramalan_tes.process') }}" method="POST" id="formPeramalan">
+            @csrf
 
-                {{-- INFO PARAMETER OPTIMAL --}}
-                <div class="alert alert-success">
-                    <i class="fas fa-search mr-1"></i>
-                    <strong>Parameter Optimal (Grid Search 729 kombinasi):</strong>
-                    &nbsp; Alpha (α) = <strong>{{ $alpha }}</strong>
-                    &nbsp;|&nbsp; Beta (β) = <strong>{{ $beta }}</strong>
-                    &nbsp;|&nbsp; Gamma (γ) = <strong>{{ $gamma }}</strong>
-                    &nbsp; — dipilih berdasarkan MAPE terkecil.
-                </div>
+            {{-- STEP 1: Pilih Merk --}}
+            <div class="mb-3">
+                <p class="font-weight-bold mb-2" style="font-size:0.85rem;color:#444;">
+                    <span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:#74271f;color:#fff;font-size:0.68rem;font-weight:700;margin-right:7px;">1</span>
+                    Pilih Merk Kendaraan
+                </p>
 
-                {{-- TABEL HASIL TES --}}
-                <div class="table-responsive mb-4">
-                    <table class="table table-bordered table-sm" width="100%" cellspacing="0">
-                        <thead class="thead-light">
-                            <tr>
-                                <th>Bulan/Tahun</th>
-                                <th>Data Aktual</th>
-                                <th>Level (Lt)</th>
-                                <th>Trend (Tt)</th>
-                                <th>Seasonal (St)</th>
-                                <th>Data Prediksi</th>
-                                <th>Error</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach($resultTable as $row)
-                            <tr>
-                                <td>{{ $row['bulan_tahun'] }}</td>
-                                <td>{{ $row['aktual'] }}</td>
-                                <td>{{ $row['level'] ?? '-' }}</td>
-                                <td>{{ $row['trend'] ?? '-' }}</td>
-                                <td>{{ $row['seasonal'] ?? '-' }}</td>
-                                <td>{{ $row['prediksi'] }}</td>
-                                <td>{{ $row['error'] }}</td>
-                            </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
-
-                {{-- GRAFIK + METRIK --}}
+                @php $merkColors = ['Avanza'=>'#e74c3c','Ertiga'=>'#27ae60','Innova'=>'#2980b9','Xenia'=>'#f39c12']; @endphp
                 <div class="row">
-                    <div class="col-lg-8">
-                        <div class="chart-area">
-                            <canvas id="tesChart"></canvas>
-                        </div>
+                    @foreach($merks as $m)
+                    @php $col = $merkColors[$m] ?? '#74271f'; @endphp
+                    <div class="col-md-3 col-6 mb-2">
+                        <label class="w-100 mb-0" style="cursor:pointer;">
+                            <input type="radio" name="merk" value="{{ $m }}"
+                                   class="d-none merk-radio"
+                                   data-color="{{ $col }}"
+                                   {{ isset($merk) && $merk == $m ? 'checked' : '' }} required>
+                            <div class="merk-box d-flex align-items-center p-3 border"
+                                 style="border-radius:10px;border-width:2px!important;transition:all 0.2s;
+                                        {{ isset($merk) && $merk == $m ? "border-color:{$col};background:{$col}12;" : 'border-color:#e9ecef;background:#f8f9fc;' }}">
+                                <div class="d-flex align-items-center justify-content-center mr-3"
+                                     style="width:36px;height:36px;border-radius:8px;background:{{ $col }}20;">
+                                    <i class="fas fa-car" style="color:{{ $col }};font-size:1rem;"></i>
+                                </div>
+                                <div>
+                                    <div class="font-weight-bold text-dark" style="font-size:0.9rem;">{{ $m }}</div>
+                                    <small class="text-muted" style="font-size:0.72rem;">Klik untuk pilih</small>
+                                </div>
+                                <div class="ml-auto merk-check" style="display:{{ isset($merk) && $merk == $m ? 'block' : 'none' }};">
+                                    <i class="fas fa-check-circle" style="color:{{ $col }};font-size:1.1rem;"></i>
+                                </div>
+                            </div>
+                        </label>
                     </div>
-                    <div class="col-lg-4">
-                        <div class="table-responsive">
-                            <table class="table table-bordered table-sm">
-                                <thead class="thead-light">
-                                    <tr>
-                                        <th>Metric</th>
-                                        <th>Value</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr><td>MAD</td><td>{{ $mad }}</td></tr>
-                                    <tr><td>MSE</td><td>{{ $mse }}</td></tr>
-                                    <tr><td>MAPE</td><td>{{ $mape }} %</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
-                <hr>
-
-                <div class="d-flex justify-content-end">
-                    <form action="{{ route('peramalan_tes.store') }}" method="POST">
-                        @csrf
-                        <input type="hidden" name="id_kendaraan" value="{{ $id_kendaraan }}">
-                        <input type="hidden" name="durasi_prediksi" value="{{ $durasi }}">
-                        <input type="hidden" name="alpha" value="{{ $alpha }}">
-                        <input type="hidden" name="beta" value="{{ $beta }}">
-                        <input type="hidden" name="gamma" value="{{ $gamma }}">
-                        <input type="hidden" name="mad" value="{{ $mad }}">
-                        <input type="hidden" name="mse" value="{{ $mse }}">
-                        <input type="hidden" name="mape" value="{{ $mape }}">
-                        <input type="hidden" name="data_peramalan" value="{{ json_encode($resultTable) }}">
-                        <button type="submit" class="btn btn-success mr-2">Simpan Hasil</button>
-                    </form>
-                    <a href="{{ url('/peramalan-tes') }}" class="btn btn-secondary">Buang</a>
-                </div>
-
-            </div>
-        </div>
-    </div>
-</div>
-@endif
-
-<!-- History Table -->
-<div class="card shadow mb-4">
-    <div class="card-header py-3">
-        <h6 class="m-0 font-weight-bold text-primary">Riwayat Peramalan TES</h6>
-    </div>
-    <div class="card-body">
-        <div class="table-responsive">
-            <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
-                <thead>
-                    <tr>
-                        <th width="5%">No</th>
-                        <th>Kendaraan</th>
-                        <th>Alpha</th>
-                        <th>Beta</th>
-                        <th>Gamma</th>
-                        <th>Jumlah Periode</th>
-                        <th>MAD</th>
-                        <th>MSE</th>
-                        <th>MAPE</th>
-                        <th width="15%">Aksi</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach($riwayat as $index => $item)
-                    <tr>
-                        <td>{{ $index + 1 }}</td>
-                        <td>{{ $item->kendaraan->nama_kendaraan ?? '-' }}</td>
-                        <td>{{ $item->alfa }}</td>
-                        <td>{{ $item->beta }}</td>
-                        <td>{{ $item->gamma }}</td>
-                        <td>{{ $item->durasi_prediksi ?? '-' }}</td>
-                        <td>{{ $item->mad }}</td>
-                        <td>{{ $item->mse }}</td>
-                        <td>{{ $item->mape }}%</td>
-                        <td>
-                            <button class="btn btn-info btn-sm btn-circle" title="Detail" onclick='showDetail(@json($item))'>
-                                <i class="fas fa-eye"></i>
-                            </button>
-                            <button class="btn btn-warning btn-sm btn-circle" title="Pembanding" onclick="showComparison({{ $item->id }})">
-                                <i class="fas fa-chart-line"></i>
-                            </button>
-                            <a href="{{ route('peramalan_tes.export_pdf', $item->id) }}" class="btn btn-secondary btn-sm btn-circle" title="Export PDF" target="_blank">
-                                <i class="fas fa-file-pdf"></i>
-                            </a>
-                            <form action="{{ route('peramalan_tes.destroy', $item->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Hapus riwayat ini?')">
-                                @csrf
-                                @method('DELETE')
-                                <button type="submit" class="btn btn-danger btn-sm btn-circle" title="Hapus">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </form>
-                        </td>
-                    </tr>
                     @endforeach
-                </tbody>
-            </table>
-        </div>
-    </div>
-</div>
-
-<!-- Container untuk Card Perbandingan -->
-<div id="dynamicCardContainer"></div>
-
-<!-- Detail Modal -->
-<div class="modal fade" id="detailModal" tabindex="-1" role="dialog" aria-labelledby="detailModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg" role="document">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="detailModalLabel">Detail Peramalan TES</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
+                </div>
             </div>
-            <div class="modal-body">
-                <div class="d-flex flex-wrap mb-3">
-                    <div class="mr-4"><strong>Kendaraan:</strong> <span id="detail_kendaraan"></span></div>
-                    <div class="mr-4"><strong>Alpha:</strong> <span id="detail_alpha"></span></div>
-                    <div class="mr-4"><strong>Beta:</strong> <span id="detail_beta"></span></div>
-                    <div class="mr-4"><strong>Gamma:</strong> <span id="detail_gamma"></span></div>
-                    <div class="mr-4"><strong>Durasi:</strong> <span id="detail_durasi"></span></div>
-                    <div><strong>Metode:</strong> TES (Grid Search)</div>
-                </div>
 
-                <div class="table-responsive mb-4">
-                    <table class="table table-bordered table-striped" width="100%" cellspacing="0">
-                        <thead>
-                            <tr>
-                                <th>Bulan/Tahun</th>
-                                <th>Data Aktual</th>
-                                <th>Level</th>
-                                <th>Trend</th>
-                                <th>Seasonal</th>
-                                <th>Data Prediksi</th>
-                                <th>Error</th>
-                            </tr>
-                        </thead>
-                        <tbody id="detail_table_body"></tbody>
-                    </table>
-                </div>
+            <hr class="my-3">
 
-                <div class="row">
-                    <div class="col-lg-8">
-                        <div class="chart-area">
-                            <canvas id="detailChart"></canvas>
+            {{-- STEP 2: Periode Prediksi --}}
+            <div class="mb-2">
+                <p class="font-weight-bold mb-2" style="font-size:0.85rem;color:#444;">
+                    <span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:#74271f;color:#fff;font-size:0.68rem;font-weight:700;margin-right:7px;">2</span>
+                    Periode Prediksi
+                </p>
+
+                <div class="row align-items-center">
+                    <div class="col-md-9">
+                        <div class="p-3" style="border-radius:12px;background:#f8f9fc;border:1.5px solid #e9ecef;">
+                            <small class="text-muted d-block mb-2">Jumlah bulan ke depan yang akan diprediksi</small>
+                            <div class="d-flex align-items-center" style="gap:10px;">
+                                <input type="number"
+                                       id="durasi_input"
+                                       name="durasi_prediksi"
+                                       min="1"
+                                       value="{{ isset($durasi) ? $durasi : 3 }}"
+                                       required
+                                       style="width:100px;height:42px;text-align:center;
+                                              border:1.5px solid #dee2e6;border-radius:8px;
+                                              font-size:1.1rem;font-weight:700;color:#74271f;
+                                              background:#fff;outline:none;">
+                                <span class="font-weight-bold" style="font-size:0.9rem;color:#555;">bulan</span>
+                            </div>
                         </div>
                     </div>
-                    <div class="col-lg-4">
-                        <div class="table-responsive">
-                            <table class="table table-bordered table-sm">
-                                <thead class="thead-light">
-                                    <tr><th>Metric</th><th>Value</th></tr>
-                                </thead>
-                                <tbody>
-                                    <tr><td>MAD</td><td id="detail_mad"></td></tr>
-                                    <tr><td>MSE</td><td id="detail_mse"></td></tr>
-                                    <tr><td>MAPE</td><td id="detail_mape"></td></tr>
-                                </tbody>
-                            </table>
-                        </div>
+
+                    <div class="col-md-3 text-center mt-3 mt-md-0">
+                        <button type="submit" class="btn text-white font-weight-bold px-4 py-2"
+                                style="background:linear-gradient(135deg,#74271f,#c0392b);border:none;border-radius:8px;font-size:0.85rem;">
+                            <i class="fas fa-cogs mr-1"></i> Proses Peramalan
+                        </button>
+                        <small class="text-muted d-block mt-1" style="font-size:0.7rem;">
+                            <i class="fas fa-info-circle mr-1"></i>Python Statsmodels
+                        </small>
                     </div>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Tutup</button>
+
+        </form>
+    </div>
+</div>
+
+{{-- ===== HASIL ===== --}}
+@if(isset($showResult) && $showResult)
+<div id="result-card">
+
+    {{-- PARAMETER HASIL PYTHON --}}
+    <div class="alert border-0 mb-3 py-3 px-4" style="background:#eaf6ff;border-left:4px solid #2980b9!important;">
+        <div class="d-flex align-items-center flex-wrap">
+            <i class="fas fa-check-circle text-success mr-2 fa-lg"></i>
+            <strong class="mr-3">Parameter Optimal (Statsmodels):</strong>
+            <span class="mr-3">α = <strong class="text-danger">{{ $alpha }}</strong></span>
+            <span class="mr-3">β = <strong class="text-primary">{{ $beta }}</strong></span>
+            <span class="mr-3">γ = <strong class="text-success">{{ $gamma }}</strong></span>
+            <span class="mr-3">Merk: <strong>{{ $merk }}</strong></span>
+            <span>Periode: <strong>{{ $durasi }} bulan</strong></span>
+        </div>
+    </div>
+
+    {{-- METRIK --}}
+    <div class="row mb-3">
+        <div class="col-md-4 mb-3">
+            <div class="card border-0 shadow-sm h-100" style="border-radius:12px;border-left:4px solid #858796!important;">
+                <div class="card-body py-3 px-4">
+                    <div class="text-xs text-uppercase text-muted font-weight-bold mb-1">MAD</div>
+                    <div class="h3 font-weight-bold text-dark mb-1">{{ $mad }}</div>
+                    <small class="text-muted">Rata-rata selisih absolut prediksi vs aktual</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="card border-0 shadow-sm h-100" style="border-radius:12px;border-left:4px solid #4e73df!important;">
+                <div class="card-body py-3 px-4">
+                    <div class="text-xs text-uppercase text-muted font-weight-bold mb-1">MSE</div>
+                    <div class="h3 font-weight-bold text-dark mb-1">{{ $mse }}</div>
+                    <small class="text-muted">Sensitivitas terhadap error besar</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="card border-0 shadow-sm h-100" style="border-radius:12px;
+                border-left:4px solid {{ $mape<=10?'#1cc88a':($mape<=20?'#4e73df':($mape<=50?'#f6c23e':'#e74a3b')) }}!important;">
+                <div class="card-body py-3 px-4">
+                    <div class="text-xs text-uppercase text-muted font-weight-bold mb-1">MAPE</div>
+                    <div class="d-flex align-items-center mb-1">
+                        <span class="h3 font-weight-bold mb-0 mr-2
+                            {{ $mape<=10?'text-success':($mape<=20?'text-primary':($mape<=50?'text-warning':'text-danger')) }}">
+                            {{ $mape }}%
+                        </span>
+                        @if($mape<=10)<span class="badge badge-success">Sangat Baik</span>
+                        @elseif($mape<=20)<span class="badge badge-primary">Baik</span>
+                        @elseif($mape<=50)<span class="badge badge-warning">Cukup</span>
+                        @else<span class="badge badge-danger">Kurang</span>@endif
+                    </div>
+                    <small class="text-muted">Rata-rata persentase kesalahan prediksi</small>
+                </div>
             </div>
         </div>
     </div>
+
+    <div class="row mb-3">
+        {{-- GRAFIK --}}
+        <div class="col-lg-8 mb-3">
+            <div class="card border-0 shadow-sm h-100" style="border-radius:12px;">
+                <div class="card-body p-3">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <h6 class="font-weight-bold mb-0">
+                            <i class="fas fa-chart-line text-primary mr-1"></i>
+                            Aktual vs Prediksi — <span class="text-danger">{{ $merk }}</span>
+                        </h6>
+                        <small class="text-muted">α={{ $alpha }} β={{ $beta }} γ={{ $gamma }}</small>
+                    </div>
+                    <div style="height:260px;">
+                        <canvas id="tesChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {{-- PREDIKSI KE DEPAN --}}
+        <div class="col-lg-4 mb-3">
+            <div class="card border-0 shadow-sm h-100 text-white"
+                 style="border-radius:12px;background:linear-gradient(160deg,#1a7a4a,#27ae60);">
+                <div class="card-body p-3">
+                    <div class="d-flex align-items-center mb-2">
+                        <i class="fas fa-calendar-check mr-2 fa-lg"></i>
+                        <div>
+                            <div class="font-weight-bold" style="font-size:0.9rem;">Hasil Prediksi</div>
+                            <small style="opacity:0.8;font-size:0.75rem;">{{ $merk }} — {{ $durasi }} bulan ke depan</small>
+                        </div>
+                    </div>
+                    <div style="max-height:220px;overflow-y:auto;">
+                        @foreach($resultTable as $row)
+                            @if($row['aktual'] === '-')
+                            <div class="d-flex justify-content-between py-1 px-2 mb-1 rounded"
+                                 style="background:rgba(255,255,255,0.15);font-size:0.82rem;">
+                                <span>{{ $row['bulan_tahun'] }}</span>
+                                <strong>{{ $row['prediksi'] }}
+                                    <small style="opacity:0.75;font-size:0.7rem;">trx</small>
+                                </strong>
+                            </div>
+                            @endif
+                        @endforeach
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- TABEL ITERASI --}}
+    <div class="card border-0 shadow-sm mb-3" style="border-radius:12px;">
+        <div class="card-header bg-white border-0 pt-3 pb-0 px-4 d-flex justify-content-between align-items-center">
+            <h6 class="font-weight-bold mb-0">
+                <i class="fas fa-table text-primary mr-1"></i> Tabel Iterasi TES
+            </h6>
+            <span class="badge badge-light border">{{ count($resultTable) }} baris</span>
+        </div>
+        <div class="card-body p-3">
+            <div class="table-responsive" style="max-height:340px;overflow-y:auto;">
+                <table class="table table-bordered table-sm table-hover mb-0" style="font-size:0.77rem;">
+                    <thead class="thead-dark" style="position:sticky;top:0;">
+                        <tr>
+                            <th>No</th><th>Bulan/Tahun</th><th>Aktual</th>
+                            <th>Level</th><th>Trend</th><th>Seasonal</th>
+                            <th>Prediksi</th><th>Error</th><th>APE%</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($resultTable as $i => $row)
+                        <tr class="{{ $row['aktual'] === '-' ? 'table-success font-weight-bold' : '' }}">
+                            <td>{{ $i+1 }}</td>
+                            <td>{{ $row['bulan_tahun'] }}</td>
+                            <td>{{ $row['aktual'] }}</td>
+                            <td>{{ $row['level'] }}</td>
+                            <td>{{ $row['trend'] }}</td>
+                            <td>{{ $row['seasonal'] }}</td>
+                            <td><strong>{{ $row['prediksi'] }}</strong></td>
+                            <td>{{ $row['error'] }}</td>
+                            <td>{{ $row['ape'] !== '-' ? $row['ape'].'%' : '-' }}</td>
+                        </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {{-- TOMBOL AKSI --}}
+    <div class="card border-0 shadow-sm mb-4" style="border-radius:12px;">
+        <div class="card-body py-3 px-4 d-flex justify-content-between align-items-center">
+            <small class="text-muted">
+                <i class="fas fa-check-circle text-success mr-1"></i>
+                Peramalan selesai. Simpan hasil untuk melihat di riwayat & perbandingan.
+            </small>
+            <div class="d-flex">
+                <form action="{{ route('peramalan_tes.store') }}" method="POST" class="mr-2">
+                    @csrf
+                    <input type="hidden" name="merk"            value="{{ $merk }}">
+                    <input type="hidden" name="durasi_prediksi" value="{{ $durasi }}">
+                    <input type="hidden" name="alpha"           value="{{ $alpha }}">
+                    <input type="hidden" name="beta"            value="{{ $beta }}">
+                    <input type="hidden" name="gamma"           value="{{ $gamma }}">
+                    <input type="hidden" name="mad"             value="{{ $mad }}">
+                    <input type="hidden" name="mse"             value="{{ $mse }}">
+                    <input type="hidden" name="mape"            value="{{ $mape }}">
+                    <input type="hidden" name="data_peramalan"  value="{{ json_encode($resultTable) }}">
+                    <button type="submit" class="btn btn-success px-4">
+                        <i class="fas fa-save mr-1"></i> Simpan ke Riwayat
+                    </button>
+                </form>
+                <a href="{{ route('peramalan_tes.index') }}" class="btn btn-outline-secondary px-4">
+                    <i class="fas fa-redo mr-1"></i> Ulangi
+                </a>
+            </div>
+        </div>
+    </div>
+
 </div>
+@endif
 
 @endsection
 
 @push('scripts')
 <script>
-    $(document).ready(function() {
-        $('#dataTable').DataTable();
-    });
-
-    var detailChartInstance = null;
-    var currentChart = null;
-
-    function showDetail(item) {
-        $('#detail_kendaraan').text(item.kendaraan ? item.kendaraan.nama_kendaraan : '-');
-        $('#detail_alpha').text(item.alfa);
-        $('#detail_beta').text(item.beta);
-        $('#detail_gamma').text(item.gamma);
-        $('#detail_mad').text(item.mad);
-        $('#detail_mse').text(item.mse);
-        $('#detail_mape').text(item.mape + '%');
-        $('#detail_durasi').text(item.durasi_prediksi ?? '-');
-
-        var tbody = $('#detail_table_body');
-        tbody.empty();
-
-        var labels = [], actuals = [], predicteds = [];
-
-        if (item.data_peramalan && item.data_peramalan.length > 0) {
-            item.data_peramalan.forEach(function(row) {
-                var tr = `
-                    <tr>
-                        <td>${row.bulan_tahun || '-'}</td>
-                        <td>${row.aktual || '-'}</td>
-                        <td>${row.level || '-'}</td>
-                        <td>${row.trend || '-'}</td>
-                        <td>${row.seasonal || '-'}</td>
-                        <td>${row.prediksi || '-'}</td>
-                        <td>${row.error || '-'}</td>
-                    </tr>`;
-                tbody.append(tr);
-                labels.push(row.bulan_tahun);
-                actuals.push(row.aktual !== '-' ? row.aktual : null);
-                predicteds.push(row.prediksi !== '-' ? row.prediksi : null);
-            });
-        } else {
-            tbody.append('<tr><td colspan="7" class="text-center">Tidak ada detail data tersimpan.</td></tr>');
-        }
-
-        $('#detailModal').modal('show');
-
-        if (detailChartInstance) detailChartInstance.destroy();
-
-        var ctx = document.getElementById("detailChart");
-        detailChartInstance = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: "Aktual",
-                    lineTension: 0.3,
-                    backgroundColor: "rgba(78, 115, 223, 0.05)",
-                    borderColor: "rgba(78, 115, 223, 1)",
-                    pointRadius: 3, pointBackgroundColor: "rgba(78, 115, 223, 1)",
-                    pointBorderColor: "rgba(78, 115, 223, 1)",
-                    pointHoverRadius: 3, pointHitRadius: 10, pointBorderWidth: 2,
-                    data: actuals,
-                }, {
-                    label: "Prediksi TES",
-                    lineTension: 0.3,
-                    backgroundColor: "rgba(28, 200, 138, 0.05)",
-                    borderColor: "rgba(28, 200, 138, 1)",
-                    pointRadius: 3, pointBackgroundColor: "rgba(28, 200, 138, 1)",
-                    pointBorderColor: "rgba(28, 200, 138, 1)",
-                    pointHoverRadius: 3, pointHitRadius: 10, pointBorderWidth: 2,
-                    data: predicteds,
-                }],
-            },
-            options: {
-                maintainAspectRatio: false,
-                layout: { padding: { left: 10, right: 25, top: 25, bottom: 0 } },
-                scales: {
-                    xAxes: [{ gridLines: { display: false, drawBorder: false }, ticks: { maxTicksLimit: 7 } }],
-                    yAxes: [{ ticks: { maxTicksLimit: 5, padding: 10 }, gridLines: { color: "rgb(234, 236, 244)", zeroLineColor: "rgb(234, 236, 244)", drawBorder: false, borderDash: [2], zeroLineBorderDash: [2] } }],
-                },
-                legend: { display: true },
-                tooltips: {
-                    backgroundColor: "rgb(255,255,255)", bodyFontColor: "#858796", titleMarginBottom: 10,
-                    titleFontColor: '#6e707e', titleFontSize: 14, borderColor: '#dddfeb', borderWidth: 1,
-                    xPadding: 15, yPadding: 15, displayColors: false, intersect: false, mode: 'index', caretPadding: 10,
-                }
-            }
+document.querySelectorAll('.merk-radio').forEach(function(radio) {
+    function applySelected(r) {
+        document.querySelectorAll('.merk-radio').forEach(function(rx) {
+            var box   = rx.nextElementSibling;
+            var check = box.querySelector('.merk-check');
+            box.style.borderColor = '#e9ecef';
+            box.style.background  = '#f8f9fc';
+            if (check) check.style.display = 'none';
         });
+        var box   = r.nextElementSibling;
+        var check = box.querySelector('.merk-check');
+        var col   = r.dataset.color || '#74271f';
+        box.style.borderColor = col;
+        box.style.background  = col + '12';
+        if (check) check.style.display = 'block';
     }
+    radio.addEventListener('change', function() { applySelected(this); });
+    if (radio.checked) applySelected(radio);
+});
 
-    function showComparison(id) {
-        $.ajax({
-            url: '/perbandingan/' + id + '/compare',
-            type: 'GET',
-            success: function(response) { renderComparisonCard(response); },
-            error: function(err) { alert('Gagal mengambil data perbandingan.'); console.error(err); }
-        });
-    }
-
-    function renderComparisonCard(data) {
-        var html = `
-        <div class="card shadow mb-4" id="comparisonCard">
-            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
-                <h6 class="m-0 font-weight-bold text-primary">Perbandingan TES vs SMA</h6>
-                <button type="button" class="close" onclick="$('#comparisonCard').remove(); if(currentChart){ currentChart.destroy(); currentChart = null; }" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>
-            <div class="card-body">
-                <div class="chart-area mb-4">
-                    <canvas id="compChartCanvas"></canvas>
-                </div>
-                <div class="table-responsive">
-                    <table class="table table-bordered text-center">
-                        <thead class="thead-light">
-                            <tr><th>Metode</th><th>MAD</th><th>MSE</th><th>MAPE</th></tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td>TES (α=${data.accuracy.tes.alpha}, β=${data.accuracy.tes.beta}, γ=${data.accuracy.tes.gamma})</td>
-                                <td>${data.accuracy.tes.mad}</td>
-                                <td>${data.accuracy.tes.mse}</td>
-                                <td>${data.accuracy.tes.mape}%</td>
-                            </tr>
-                            <tr>
-                                <td>SMA (periode 3)</td>
-                                <td>${data.accuracy.sma.mad}</td>
-                                <td>${data.accuracy.sma.mse}</td>
-                                <td>${data.accuracy.sma.mape}%</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-                <div class="alert alert-info text-center mt-3">${data.conclusion}</div>
-            </div>
-        </div>`;
-
-        $('#dynamicCardContainer').html(html);
-
-        var ctx = document.getElementById("compChartCanvas");
-        if (currentChart) currentChart.destroy();
-
-        currentChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: data.chart.labels,
-                datasets: [
-                    {
-                        label: "Aktual",
-                        lineTension: 0.3,
-                        borderColor: "rgba(78, 115, 223, 1)",
-                        pointRadius: 3, pointBackgroundColor: "rgba(78, 115, 223, 1)",
-                        data: data.chart.actual, fill: false
-                    },
-                    {
-                        label: "TES",
-                        lineTension: 0.3,
-                        borderColor: "rgba(246, 194, 62, 1)",
-                        pointRadius: 3, pointBackgroundColor: "rgba(246, 194, 62, 1)",
-                        data: data.chart.tes, fill: false, borderDash: [5, 5]
-                    },
-                    {
-                        label: "SMA",
-                        lineTension: 0.3,
-                        borderColor: "rgba(28, 200, 138, 1)",
-                        pointRadius: 3, pointBackgroundColor: "rgba(28, 200, 138, 1)",
-                        data: data.chart.sma, fill: false, borderDash: [5, 5]
-                    }
-                ]
-            },
-            options: {
-                maintainAspectRatio: false,
-                tooltips: { mode: 'index', intersect: false }
-            }
-        });
-
-        $('html, body').animate({ scrollTop: $("#dynamicCardContainer").offset().top - 100 }, 500);
-    }
-
-    @if(isset($showResult) && $showResult)
-    var ctx = document.getElementById("tesChart");
-    var myLineChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: @json($chartLabels),
-            datasets: [{
-                label: "Aktual",
-                lineTension: 0.3,
-                backgroundColor: "rgba(78, 115, 223, 0.05)",
-                borderColor: "rgba(78, 115, 223, 1)",
-                pointRadius: 3, pointBackgroundColor: "rgba(78, 115, 223, 1)",
-                pointBorderColor: "rgba(78, 115, 223, 1)",
-                pointHoverRadius: 3, pointHoverBackgroundColor: "rgba(78, 115, 223, 1)",
-                pointHoverBorderColor: "rgba(78, 115, 223, 1)",
-                pointHitRadius: 10, pointBorderWidth: 2,
-                data: @json($actualData),
-            }, {
-                label: "Prediksi TES",
-                lineTension: 0.3,
-                backgroundColor: "rgba(28, 200, 138, 0.05)",
-                borderColor: "rgba(28, 200, 138, 1)",
-                pointRadius: 3, pointBackgroundColor: "rgba(28, 200, 138, 1)",
-                pointBorderColor: "rgba(28, 200, 138, 1)",
-                pointHoverRadius: 3, pointHoverBackgroundColor: "rgba(28, 200, 138, 1)",
-                pointHoverBorderColor: "rgba(28, 200, 138, 1)",
-                pointHitRadius: 10, pointBorderWidth: 2,
-                data: @json($predictedData),
-            }],
+@if(isset($showResult) && $showResult)
+new Chart(document.getElementById("tesChart"), {
+    type: 'line',
+    data: {
+        labels: @json($chartLabels),
+        datasets: [{
+            label: "Aktual",
+            lineTension: 0.3,
+            backgroundColor: "rgba(78,115,223,0.07)",
+            borderColor: "rgba(78,115,223,1)",
+            borderWidth: 2, pointRadius: 2, pointHitRadius: 10,
+            data: @json($actualData),
+        },{
+            label: "Prediksi TES",
+            lineTension: 0.3,
+            backgroundColor: "rgba(28,200,138,0.07)",
+            borderColor: "rgba(28,200,138,1)",
+            borderWidth: 2, pointRadius: 2, pointHitRadius: 10,
+            borderDash: [5,3],
+            data: @json($predictedData),
+        }],
+    },
+    options: {
+        maintainAspectRatio: false,
+        scales: {
+            xAxes: [{ gridLines:{display:false}, ticks:{maxTicksLimit:10,fontSize:10} }],
+            yAxes: [{ ticks:{maxTicksLimit:5,padding:10,fontSize:10},
+                gridLines:{color:"rgb(234,236,244)",drawBorder:false,borderDash:[2]} }],
         },
-        options: {
-            maintainAspectRatio: false,
-            layout: { padding: { left: 10, right: 25, top: 25, bottom: 0 } },
-            scales: {
-                xAxes: [{ gridLines: { display: false, drawBorder: false }, ticks: { maxTicksLimit: 7 } }],
-                yAxes: [{ ticks: { maxTicksLimit: 5, padding: 10 }, gridLines: { color: "rgb(234, 236, 244)", zeroLineColor: "rgb(234, 236, 244)", drawBorder: false, borderDash: [2], zeroLineBorderDash: [2] } }],
-            },
-            legend: { display: true },
-            tooltips: {
-                backgroundColor: "rgb(255,255,255)", bodyFontColor: "#858796", titleMarginBottom: 10,
-                titleFontColor: '#6e707e', titleFontSize: 14, borderColor: '#dddfeb', borderWidth: 1,
-                xPadding: 15, yPadding: 15, displayColors: false, intersect: false, mode: 'index', caretPadding: 10,
-            }
+        legend: { display:true, position:'top', labels:{fontSize:11} },
+        tooltips: {
+            backgroundColor:"#fff", bodyFontColor:"#858796", titleFontColor:'#6e707e',
+            borderColor:'#dddfeb', borderWidth:1,
+            xPadding:15, yPadding:15, intersect:false, mode:'index',
         }
-    });
-    @endif
+    }
+});
+setTimeout(function(){
+    $('html,body').animate({scrollTop:$('#result-card').offset().top - 80},400);
+},300);
+@endif
 </script>
 @endpush

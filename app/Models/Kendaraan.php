@@ -9,25 +9,21 @@ class Kendaraan extends Model
 {
     use HasFactory;
 
-    /**
-     * Nama tabel yang didefinisikan secara eksplisit.
-     */
     protected $table = 'kendaraan';
 
-    /**
-     * Atribut yang dapat diisi (Mass Assignment).
-     */
     protected $fillable = [
-        'nama_kendaraan',
-        'unit',
+        'merk',
+        'plat',
+        'status',
     ];
 
-    /**
-     * Relasi: Satu kendaraan memiliki banyak data pemakaian.
-     * (Kita akan buat model PemakaianKendaraan setelah ini)
-     */
     public function pemakaian()
     {
         return $this->hasMany(PemakaianKendaraan::class, 'id_kendaraan', 'id');
+    }
+
+    public function transaksiPenyewaan()
+    {
+        return $this->hasMany(TransaksiPenyewaan::class, 'id_kendaraan', 'id');
     }
 }
