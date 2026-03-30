@@ -27,7 +27,8 @@ class PeramalanTesController extends Controller
     {
         $input = json_encode(['values' => $values]);
 
-        $tmpFile = storage_path('app/tes_input_' . time() . '.json');
+        //$tmpFile = storage_path('app/tes_input_' . time() . '.json');
+        $tmpFile = '/tmp/tes_input_' . time() . '.json';
         file_put_contents($tmpFile, $input);
 
         $scriptPath = base_path('tes_optimize.py');
