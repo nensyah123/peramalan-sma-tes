@@ -19,6 +19,7 @@ class PerbandinganController extends Controller
     {
         $peramalan = PeramalanTes::findOrFail($id);
 
+        // Tentukan kualitas berdasarkan nilai MAPE
         $kualitas = 'kurang akurat (> 50%)';
         if ($peramalan->mape < 10)     $kualitas = 'sangat baik (< 10%)';
         elseif ($peramalan->mape < 20) $kualitas = 'baik (10-20%)';
@@ -39,15 +40,16 @@ class PerbandinganController extends Controller
         $peramalanTes = PeramalanTes::findOrFail($id);
         $merk         = $peramalanTes->merk;
         $durasi       = (int) $peramalanTes->durasi_prediksi;
-        $s            = 12;
+        $s            = 12; // Periode musiman = 12 bulan
 
-        // Ambil id kendaraan berdasarkan merk
+        // Ambil semua ID kendaraan berdasarkan merk
         $ids = Kendaraan::where('merk', $merk)->pluck('id');
 
-        // Exclude bulan berjalan
+        // Exclude bulan berjalan agar data tidak terpotong
         $bulanSekarang = (int) date('m');
         $tahunSekarang = (int) date('Y');
 
+        // Ambil data historis penyewaan per bulan
         $raw = TransaksiPenyewaan::selectRaw(
                 'MONTH(tgl_pinjam) as bulan, YEAR(tgl_pinjam) as tahun, COUNT(*) as total'
             )
@@ -64,7 +66,7 @@ class PerbandinganController extends Controller
             ->orderBy('bulan', 'asc')
             ->get();
 
-        // Susun data
+        // Susun array values, labels, dan bulanData
         $values    = [];
         $labels    = [];
         $bulanData = [];
@@ -75,7 +77,8 @@ class PerbandinganController extends Controller
             $bulanData[] = ['bulan' => (int) $row->bulan, 'tahun' => (int) $row->tahun];
         }
 
-        // ===== STEP 1: Dapatkan α, β, γ optimal dari Python =====
+        // ===== STEP 1: Dapatkan α, β, γ optimal dari Railway Python API =====
+        // Menggantikan exec/shell_exec python yang tidak bisa jalan di Vercel
         try {
             $params = $this->getOptimalParams($values);
         } catch (\Exception $e) {
@@ -110,7 +113,7 @@ class PerbandinganController extends Controller
         $smaResult = $this->calculateSMA($dataAktual, $periode_sma, $durasi);
         $mape_sma  = $smaResult['metrics']['mape'];
 
-        // ===== Susun data chart =====
+        // ===== Susun data untuk chart =====
         $chartLabels    = [];
         $actualData     = [];
         $tesPredictions = [];
@@ -121,10 +124,12 @@ class PerbandinganController extends Controller
             $tesPredictions[] = ($row['prediksi'] !== '-') ? (float) $row['prediksi'] : null;
         }
 
+        // Sesuaikan panjang array SMA dengan TES
         $smaPredictions = $smaResult['chart']['predicted'];
         while (count($smaPredictions) < count($chartLabels)) $smaPredictions[] = null;
         $smaPredictions = array_slice($smaPredictions, 0, count($chartLabels));
 
+        // Tentukan metode yang lebih baik berdasarkan MAPE
         $better     = ($mape_sma < $mape_tes) ? 'SMA' : 'TES';
         $betterMape = ($better === 'SMA') ? $mape_sma : $mape_tes;
 
@@ -157,30 +162,34 @@ class PerbandinganController extends Controller
             ->with('success', 'Riwayat peramalan berhasil dihapus.');
     }
 
-    // ===== PYTHON: HANYA UNTUK OPTIMASI α, β, γ =====
+    // ===== OPTIMASI α, β, γ via Railway API (Python FastAPI) =====
+    // Menggantikan exec/shell_exec python yang tidak bisa jalan di Vercel
+    // karena Vercel tidak support Python runtime dan filesystem-nya read-only
     private function getOptimalParams(array $values): array
     {
-        $input = json_encode(['values' => $values]);
+        // Kirim data historis ke Python API yang di-deploy di Railway
+        $response = \Illuminate\Support\Facades\Http::timeout(60)
+            ->post('https://python-optimasi-api-production.up.railway.app/optimasi', [
+                'values' => $values,
+            ]);
 
-        $tmpFile = storage_path('app/tes_compare_' . time() . '.json');
-        file_put_contents($tmpFile, $input);
+        // Jika request gagal (network error, server down, dll)
+        if ($response->failed()) {
+            throw new \Exception('Gagal koneksi ke Python API: ' . $response->body());
+        }
 
-        $scriptPath = base_path('tes_optimize.py');
-        $command    = "python \"$scriptPath\" \"$tmpFile\" 2>&1";
-        $outputRaw  = shell_exec($command);
+        $result = $response->json();
 
-        @unlink($tmpFile);
-
-        $result = json_decode($outputRaw, true);
-
+        // Validasi response harus mengandung alpha
         if (!$result || !isset($result['alpha'])) {
-            throw new \Exception('Gagal menjalankan Python: ' . $outputRaw);
+            throw new \Exception('Response tidak valid dari Python API');
         }
 
         return $result;
     }
 
     // ===== TAHAP 1: INISIALISASI MANUAL =====
+    // Menghitung nilai awal Level (L0), Trend (b0), dan Seasonal (S0)
     private function hitungInisialisasi(array $values, int $s = 12): array
     {
         $n = count($values);
@@ -209,6 +218,8 @@ class PerbandinganController extends Controller
     }
 
     // ===== TAHAP 2 & 3: ITERASI + FORECAST MANUAL =====
+    // Menghitung nilai Level, Trend, Seasonal, Prediksi, dan Error
+    // menggunakan metode Holt-Winters Triple Exponential Smoothing
     private function hitungTESManual(
         array $values,
         array $labels,
@@ -221,7 +232,7 @@ class PerbandinganController extends Controller
     ): array {
         $n = count($values);
 
-        // Inisialisasi
+        // Ambil nilai inisialisasi awal
         $init = $this->hitungInisialisasi($values, $s);
         $L    = $init['L0'];
         $b    = $init['b0'];
@@ -236,7 +247,7 @@ class PerbandinganController extends Controller
         for ($i = 0; $i < $n; $i++) {
             $aktual = $values[$i];
 
-            // Baris 1-11: kosong semua (periode inisialisasi)
+            // Baris 1-11: periode inisialisasi, semua kolom kosong (-)
             if ($i < 11) {
                 $resultTable[] = [
                     'bulan_tahun' => $labels[$i],
@@ -252,7 +263,7 @@ class PerbandinganController extends Controller
                 continue;
             }
 
-            // Baris 12 (Des): tampilkan nilai awal inisialisasi
+            // Baris 12 (Desember tahun pertama): tampilkan nilai inisialisasi awal
             if ($i === 11) {
                 $resultTable[] = [
                     'bulan_tahun' => $labels[$i],
@@ -268,26 +279,26 @@ class PerbandinganController extends Controller
                 continue;
             }
 
-            // Baris 13+: iterasi menggunakan rumus Holt-Winters
-            $St_s = $S[$i % $s];
+            // Baris 13+: iterasi Holt-Winters
+            $St_s = $S[$i % $s]; // Ambil nilai seasonal periode lalu
 
-            // FIX: Hitung Ft_raw TANPA dibulatkan dulu
+            // Hitung Ft_raw TANPA dibulatkan dulu
             // agar error & APE lebih presisi (sama dengan Excel)
             $Ft_raw = $L + $b + $St_s;
 
-            // Update Level
+            // Update Level menggunakan alpha
             $L_new = $alpha * ($aktual - $St_s) + (1 - $alpha) * ($L + $b);
 
-            // Update Trend
+            // Update Trend menggunakan beta
             $b_new = $beta * ($L_new - $L) + (1 - $beta) * $b;
 
-            // Update Seasonal
+            // Update Seasonal menggunakan gamma
             $S[$i % $s] = $gamma * ($aktual - $L_new) + (1 - $gamma) * $St_s;
 
             $L = $L_new;
             $b = $b_new;
 
-            // FIX: Hitung Error dari Ft_raw (nilai asli, bukan yang dibulatkan)
+            // Hitung error dari Ft_raw (nilai asli, bukan yang dibulatkan)
             $err = abs($aktual - $Ft_raw);
             $ape = $aktual != 0 ? ($err / $aktual) * 100 : 0;
 
@@ -309,7 +320,7 @@ class PerbandinganController extends Controller
             ];
         }
 
-        // Hitung metrik akurasi
+        // Hitung metrik akurasi keseluruhan
         $mad  = $count > 0 ? round($totalMad  / $count, 4) : 0;
         $mse  = $count > 0 ? round($totalMse  / $count, 4) : 0;
         $mape = $count > 0 ? round($totalMape / $count, 4) : 0;
@@ -322,9 +333,10 @@ class PerbandinganController extends Controller
             $lastBulan++;
             if ($lastBulan > 12) { $lastBulan = 1; $lastTahun++; }
 
+            // Gunakan indeks seasonal yang sesuai
             $idx = ($n - $s + $h - 1) % $s;
             $Ft  = $L + $b * $h + $S[$idx];
-            $Ft  = round(max(0, $Ft), 2);
+            $Ft  = round(max(0, $Ft), 2); // Pastikan tidak negatif
 
             $resultTable[] = [
                 'bulan_tahun' => $this->getMonthName($lastBulan) . ' ' . $lastTahun,
@@ -348,7 +360,8 @@ class PerbandinganController extends Controller
     }
 
     // ===== HITUNG SMA m=12 =====
-    // m=12 disesuaikan dengan seasonal period TES (12 bulan)
+    // Simple Moving Average dengan periode 12 bulan
+    // disesuaikan dengan seasonal period TES
     private function calculateSMA(array $data, int $periode, int $durasi): array
     {
         $nData           = count($data);
@@ -361,6 +374,7 @@ class PerbandinganController extends Controller
         for ($i = 0; $i < $nData; $i++) {
             $prediksi = null;
             if ($i >= $periode) {
+                // Hitung rata-rata dari m periode sebelumnya
                 $sum = 0;
                 for ($k = 1; $k <= $periode; $k++) $sum += $data[$i - $k]['aktual'];
                 $prediksi = round($sum / $periode, 2);
@@ -376,6 +390,7 @@ class PerbandinganController extends Controller
             $predictions[] = $prediksi;
         }
 
+        // Hitung metrik akurasi SMA
         $mad  = ($count_error > 0) ? round($total_error_abs / $count_error, 4) : 0;
         $mse  = ($count_error > 0) ? round($total_error_sqr / $count_error, 4) : 0;
         $mape = ($count_error > 0) ? round($total_ape       / $count_error, 4) : 0;
@@ -398,6 +413,7 @@ class PerbandinganController extends Controller
         ];
     }
 
+    // ===== HELPER: Konversi nomor bulan ke nama bulan =====
     private function getMonthName(int $monthNum): string
     {
         return \DateTime::createFromFormat('!m', $monthNum)->format('M');
