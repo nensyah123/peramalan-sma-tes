@@ -22,35 +22,30 @@ class PeramalanTesController extends Controller
         return view('menu.riwayat_tes', compact('riwayat'));
     }
 
-    // ===== OPTIMASI α, β, γ via Railway API (Python FastAPI) =====
-    // Menggantikan exec/shell_exec python yang tidak bisa jalan di Vercel
-    // karena Vercel tidak support Python runtime dan filesystem-nya read-only
+    // ===== PYTHON: HANYA UNTUK OPTIMASI α, β, γ =====
     private function getOptimalParams(array $values): array
     {
-        // Kirim data historis ke Python API yang di-deploy di Railway
-        $response = \Illuminate\Support\Facades\Http::timeout(60)
-            ->post('https://python-optimasi-api-production.up.railway.app/optimasi', [
-                'values' => $values,
-            ]);
+        $input = json_encode(['values' => $values]);
 
-        // Jika request gagal (network error, server down, dll)
-        if ($response->failed()) {
-            throw new \Exception('Gagal koneksi ke Python API: ' . $response->body());
-        }
+        $tmpFile = storage_path('app/tes_input_' . time() . '.json');
+        file_put_contents($tmpFile, $input);
 
-        $result = $response->json();
+        $scriptPath = base_path('tes_optimize.py');
+        $command    = "python \"$scriptPath\" \"$tmpFile\" 2>&1";
+        $outputRaw  = shell_exec($command);
 
-        // Validasi response harus mengandung alpha
+        @unlink($tmpFile);
+
+        $result = json_decode($outputRaw, true);
+
         if (!$result || !isset($result['alpha'])) {
-            throw new \Exception('Response tidak valid dari Python API');
+            throw new \Exception('Gagal menjalankan Python: ' . $outputRaw);
         }
 
-        // Return array berisi alpha, beta, gamma yang sudah dioptimasi
         return $result;
     }
 
     // ===== TAHAP 1: INISIALISASI MANUAL =====
-    // Menghitung nilai awal Level (L0), Trend (b0), dan Seasonal (S0)
     private function hitungInisialisasi(array $values, int $s = 12): array
     {
         $n = count($values);
@@ -79,8 +74,6 @@ class PeramalanTesController extends Controller
     }
 
     // ===== TAHAP 2 & 3: ITERASI + FORECAST MANUAL =====
-    // Menghitung nilai Level, Trend, Seasonal, Prediksi, dan Error
-    // menggunakan metode Holt-Winters Triple Exponential Smoothing
     private function hitungTESManual(
         array $values,
         array $labels,
@@ -93,7 +86,7 @@ class PeramalanTesController extends Controller
     ): array {
         $n = count($values);
 
-        // Ambil nilai inisialisasi awal
+        // Inisialisasi
         $init = $this->hitungInisialisasi($values, $s);
         $L    = $init['L0'];
         $b    = $init['b0'];
@@ -108,14 +101,14 @@ class PeramalanTesController extends Controller
         for ($i = 0; $i < $n; $i++) {
             $aktual = $values[$i];
 
-            // Baris 1-11: periode inisialisasi, semua kolom kosong (-)
+            // Baris 1-11: kosong semua (periode inisialisasi)
             if ($i < 11) {
                 $resultTable[] = [
                     'bulan_tahun' => $labels[$i],
                     'aktual'      => $aktual,
                     'level'       => '-',
                     'trend'       => '-',
-                    'seasonal'    => round($S[$i], 4), 
+                    'seasonal'    => round($S[$i], 4),
                     'prediksi'    => '-',
                     'error'       => '-',
                     'error_sqr'   => '-',
@@ -124,7 +117,7 @@ class PeramalanTesController extends Controller
                 continue;
             }
 
-            // Baris 12 (Desember tahun pertama): tampilkan nilai inisialisasi awal
+            // Baris 12 (Des): tampilkan nilai awal inisialisasi
             if ($i === 11) {
                 $resultTable[] = [
                     'bulan_tahun' => $labels[$i],
@@ -140,26 +133,26 @@ class PeramalanTesController extends Controller
                 continue;
             }
 
-            // Baris 13+: iterasi Holt-Winters
-            $St_s = $S[$i % $s]; // Ambil nilai seasonal periode lalu
+            // Baris 13+: iterasi menggunakan rumus Holt-Winters
+            $St_s = $S[$i % $s];
 
-            // Forecast periode ini menggunakan L, b, dan S sebelumnya
+            // Forecast periode ini
             $Ft = $L + $b + $St_s;
             $Ft = round($Ft, 2);
 
-            // Update Level menggunakan alpha
+            // Update Level
             $L_new = $alpha * ($aktual - $St_s) + (1 - $alpha) * ($L + $b);
 
-            // Update Trend menggunakan beta
+            // Update Trend
             $b_new = $beta * ($L_new - $L) + (1 - $beta) * $b;
 
-            // Update Seasonal menggunakan gamma
+            // Update Seasonal
             $S[$i % $s] = $gamma * ($aktual - $L_new) + (1 - $gamma) * $St_s;
 
             $L = $L_new;
             $b = $b_new;
 
-            // Hitung error (MAD, MSE, MAPE)
+            // Hitung Error
             $err = abs($aktual - $Ft);
             $ape = $aktual != 0 ? ($err / $aktual) * 100 : 0;
 
@@ -181,13 +174,12 @@ class PeramalanTesController extends Controller
             ];
         }
 
-        // Hitung metrik akurasi keseluruhan
+        // Hitung metrik akurasi
         $mad  = $count > 0 ? round($totalMad  / $count, 4) : 0;
         $mse  = $count > 0 ? round($totalMse  / $count, 4) : 0;
         $mape = $count > 0 ? round($totalMape / $count, 4) : 0;
 
         // ===== TAHAP 4: FORECAST KE DEPAN =====
-        // Lanjutkan prediksi sesuai durasi yang diminta
         $lastBulan = $bulanData[$n - 1]['bulan'];
         $lastTahun = $bulanData[$n - 1]['tahun'];
 
@@ -195,10 +187,9 @@ class PeramalanTesController extends Controller
             $lastBulan++;
             if ($lastBulan > 12) { $lastBulan = 1; $lastTahun++; }
 
-            // Gunakan indeks seasonal yang sesuai
             $idx = ($n - $s + $h - 1) % $s;
             $Ft  = $L + $b * $h + $S[$idx];
-            $Ft  = round(max(0, $Ft), 2); // Pastikan tidak negatif
+            $Ft  = round(max(0, $Ft), 2);
 
             $resultTable[] = [
                 'bulan_tahun' => $this->getMonthName($lastBulan) . ' ' . $lastTahun,
@@ -221,7 +212,6 @@ class PeramalanTesController extends Controller
         ];
     }
 
-    // ===== PROSES UTAMA PERAMALAN =====
     public function process(Request $request)
     {
         $request->validate([
@@ -231,22 +221,23 @@ class PeramalanTesController extends Controller
 
         $merk   = $request->merk;
         $durasi = (int) $request->durasi_prediksi;
-        $s      = 12; // Periode musiman = 12 bulan
+        $s      = 12;
 
-        // Ambil semua ID kendaraan berdasarkan merk
         $ids = Kendaraan::where('merk', $merk)->pluck('id');
 
         if ($ids->isEmpty()) {
             return back()->with('error', 'Merk kendaraan tidak ditemukan.');
         }
 
-        // Exclude bulan berjalan agar data tidak terpotong
+        // Exclude bulan berjalan
         $bulanSekarang = (int) date('m');
         $tahunSekarang = (int) date('Y');
 
-        // Ambil data historis penyewaan per bulan
         $raw = TransaksiPenyewaan::selectRaw('MONTH(tgl_pinjam) as bulan, YEAR(tgl_pinjam) as tahun, COUNT(*) as total')
             ->whereIn('id_kendaraan', $ids)
+            // Hanya hitung transaksi yang sudah selesai (bukan masih "Disewa")
+            ->where('status', '!=', 'Disewa')
+            ->whereNotNull('tgl_kembali')
             ->where(function($query) use ($bulanSekarang, $tahunSekarang) {
                 $query->whereYear('tgl_pinjam', '<', $tahunSekarang)
                       ->orWhere(function($q) use ($bulanSekarang, $tahunSekarang) {
@@ -259,7 +250,6 @@ class PeramalanTesController extends Controller
             ->orderBy('bulan', 'asc')
             ->get();
 
-        // Minimal 12 data untuk TES
         if ($raw->count() < $s) {
             return back()->with('error', 'Data historis harus minimal ' . $s . ' bulan untuk metode TES.');
         }
@@ -274,7 +264,7 @@ class PeramalanTesController extends Controller
             $bulanData[] = ['bulan' => (int)$row->bulan, 'tahun' => (int)$row->tahun];
         }
 
-        // ===== STEP 1: Dapatkan α, β, γ optimal dari Railway Python API =====
+        // ===== STEP 1: Dapatkan α, β, γ optimal dari Python =====
         try {
             $params = $this->getOptimalParams($values);
         } catch (\Exception $e) {
@@ -285,7 +275,7 @@ class PeramalanTesController extends Controller
         $beta  = $params['beta'];
         $gamma = $params['gamma'];
 
-        // ===== STEP 2: Hitung TES secara manual di PHP =====
+        // ===== STEP 2: Hitung semua tahap manual di PHP =====
         $result = $this->hitungTESManual(
             $values, $labels, $bulanData,
             $alpha, $beta, $gamma,
@@ -297,7 +287,6 @@ class PeramalanTesController extends Controller
         $mape        = $result['mape'];
         $resultTable = $result['result_table'];
 
-        // Siapkan data untuk chart
         $chartLabels   = [];
         $actualData    = [];
         $predictedData = [];
@@ -320,7 +309,6 @@ class PeramalanTesController extends Controller
         ))->with('showResult', true);
     }
 
-    // ===== SIMPAN HASIL PERAMALAN =====
     public function store(Request $request)
     {
         $request->validate([
@@ -351,7 +339,6 @@ class PeramalanTesController extends Controller
             ->with('success', 'Hasil peramalan TES berhasil disimpan.');
     }
 
-    // ===== HAPUS RIWAYAT PERAMALAN =====
     public function destroy($id)
     {
         PeramalanTes::findOrFail($id)->delete();
@@ -359,13 +346,11 @@ class PeramalanTesController extends Controller
             ->with('success', 'Riwayat peramalan berhasil dihapus.');
     }
 
-    // ===== HELPER: Konversi nomor bulan ke nama bulan =====
     private function getMonthName($monthNum)
     {
         return \DateTime::createFromFormat('!m', $monthNum)->format('M');
     }
 
-    // ===== EXPORT PDF =====
     public function exportPdf($id)
     {
         $peramalan = PeramalanTes::findOrFail($id);
@@ -388,7 +373,6 @@ class PeramalanTesController extends Controller
             $predicteds[] = ($row['prediksi'] !== '-') ? $row['prediksi'] : null;
         }
 
-        // Hitung batas grafik SVG
         $allValues = array_merge(
             array_filter($actuals,    fn($v) => $v !== null),
             array_filter($predicteds, fn($v) => $v !== null)
@@ -399,7 +383,6 @@ class PeramalanTesController extends Controller
         $minY    = max(0, $minY - $padding);
         $maxY   += $padding;
 
-        // Konfigurasi dimensi SVG
         $svgWidth     = 1000; $svgHeight     = 300;
         $paddingLeft  = 50;   $paddingBottom = 30;
         $graphWidth   = $svgWidth  - $paddingLeft;
@@ -407,14 +390,12 @@ class PeramalanTesController extends Controller
         $count        = count($labels);
         $stepX        = $graphWidth / max(1, $count - 1);
 
-        // Fungsi konversi nilai ke koordinat Y
         $getY = function ($val) use ($graphHeight, $minY, $maxY) {
             if ($val === null) return null;
             $ratio = ($val - $minY) / max(1, $maxY - $minY);
             return $graphHeight - ($ratio * $graphHeight);
         };
 
-        // Buat titik-titik untuk polyline
         $actualPoints = []; $predictedPoints = [];
         foreach ($labels as $i => $label) {
             $x     = $paddingLeft + ($i * $stepX);
@@ -424,7 +405,6 @@ class PeramalanTesController extends Controller
             if ($yPred !== null) $predictedPoints[] = "$x,$yPred";
         }
 
-        // Bangun SVG untuk grafik di PDF
         $svgContent  = '<svg width="'.$svgWidth.'" height="'.$svgHeight.'" xmlns="http://www.w3.org/2000/svg">';
         $svgContent .= '<rect x="0" y="0" width="'.$svgWidth.'" height="'.$svgHeight.'" fill="none" stroke="#f0f0f0" stroke-width="1"/>';
         for ($i = 0; $i <= 4; $i++) {
@@ -448,7 +428,6 @@ class PeramalanTesController extends Controller
         $svgContent .= '<text x="'.($svgWidth-55).'"  y="19" font-size="11" fill="#333">Prediksi</text>';
         $svgContent .= '</svg>';
 
-        // Encode SVG ke base64 untuk di-embed di PDF
         $chartImage = 'data:image/svg+xml;base64,' . base64_encode($svgContent);
 
         $pdf = Pdf::loadView('pdf.peramalan_tes', compact('peramalan', 'metrics', 'table', 'chartImage'));
