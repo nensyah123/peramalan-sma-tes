@@ -6,6 +6,7 @@ use App\Models\Kendaraan;
 use App\Models\PeramalanTes;
 use App\Models\TransaksiPenyewaan;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
 use Barryvdh\DomPDF\Facade\Pdf;
 
 class PeramalanTesController extends Controller
@@ -22,24 +23,23 @@ class PeramalanTesController extends Controller
         return view('menu.riwayat_tes', compact('riwayat'));
     }
 
-    // ===== PYTHON: HANYA UNTUK OPTIMASI α, β, γ =====
+    // ===== PYTHON FASTAPI: HANYA UNTUK OPTIMASI α, β, γ =====
     private function getOptimalParams(array $values): array
     {
-        $input = json_encode(['values' => $values]);
+        $url = env('PYTHON_API_URL', 'https://python-optimasi-api-production.up.railway.app');
 
-        $tmpFile = storage_path('app/tes_input_' . time() . '.json');
-        file_put_contents($tmpFile, $input);
+        $response = Http::timeout(30)->post($url . '/optimasi', [
+            'values' => $values,
+        ]);
 
-        $scriptPath = base_path('tes_optimize.py');
-        $command    = "python \"$scriptPath\" \"$tmpFile\" 2>&1";
-        $outputRaw  = shell_exec($command);
+        if (!$response->ok()) {
+            throw new \Exception('Gagal memanggil Python API: ' . $response->body());
+        }
 
-        @unlink($tmpFile);
+        $result = $response->json();
 
-        $result = json_decode($outputRaw, true);
-
-        if (!$result || !isset($result['alpha'])) {
-            throw new \Exception('Gagal menjalankan Python: ' . $outputRaw);
+        if (!isset($result['alpha'])) {
+            throw new \Exception('Response Python API tidak valid: ' . json_encode($result));
         }
 
         return $result;
@@ -133,20 +133,20 @@ class PeramalanTesController extends Controller
                 continue;
             }
 
-            // Baris 13+: iterasi menggunakan rumus Holt-Winters
+            // Baris 13+: iterasi menggunakan rumus Holt-Winters Additif
             $St_s = $S[$i % $s];
 
-            // Forecast periode ini
+            // Forecast periode ini: Ft = Lt-1 + bt-1 + St-s
             $Ft = $L + $b + $St_s;
             $Ft = round($Ft, 2);
 
-            // Update Level
+            // Update Level: Lt = α(Yt - St-s) + (1-α)(Lt-1 + bt-1)
             $L_new = $alpha * ($aktual - $St_s) + (1 - $alpha) * ($L + $b);
 
-            // Update Trend
+            // Update Trend: Tt = β(Lt - Lt-1) + (1-β)bt-1
             $b_new = $beta * ($L_new - $L) + (1 - $beta) * $b;
 
-            // Update Seasonal
+            // Update Seasonal: St = γ(Yt - Lt) + (1-γ)St-s
             $S[$i % $s] = $gamma * ($aktual - $L_new) + (1 - $gamma) * $St_s;
 
             $L = $L_new;
@@ -264,7 +264,7 @@ class PeramalanTesController extends Controller
             $bulanData[] = ['bulan' => (int)$row->bulan, 'tahun' => (int)$row->tahun];
         }
 
-        // ===== STEP 1: Dapatkan α, β, γ optimal dari Python =====
+        // ===== STEP 1: Dapatkan α, β, γ optimal dari Python FastAPI =====
         try {
             $params = $this->getOptimalParams($values);
         } catch (\Exception $e) {
