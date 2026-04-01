@@ -115,7 +115,7 @@ class PeramalanTesController extends Controller
                     'aktual'      => $aktual,
                     'level'       => '-',
                     'trend'       => '-',
-                    'seasonal'    => '-',
+                    'seasonal'    => round($S[$i], 4), 
                     'prediksi'    => '-',
                     'error'       => '-',
                     'error_sqr'   => '-',
