@@ -190,15 +190,29 @@
                     <div style="max-height:220px;overflow-y:auto;">
                         @foreach($resultTable as $row)
                             @if($row['aktual'] === '-')
-                            <div class="d-flex justify-content-between py-1 px-2 mb-1 rounded"
-                                 style="background:rgba(255,255,255,0.15);font-size:0.82rem;">
-                                <span>{{ $row['bulan_tahun'] }}</span>
-                                <strong>{{ $row['prediksi'] }}
-                                    <small style="opacity:0.75;font-size:0.7rem;">trx</small>
-                                </strong>
+                            <div class="py-2 px-2 mb-2 rounded" style="background:rgba(255,255,255,0.15);font-size:0.82rem;">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="font-weight-bold" style="font-size:0.85rem;">
+                                        <i class="fas fa-calendar-alt mr-1" style="opacity:0.8;"></i>
+                                        {{ $row['bulan_tahun'] }}
+                                    </span>
+                                    <strong style="font-size:1rem;">
+                                        {{ round($row['prediksi']) }}
+                                        <small style="opacity:0.75;font-size:0.7rem;">kali sewa</small>
+                                    </strong>
+                                </div>
+                                <small style="opacity:0.85;font-size:0.72rem;display:block;line-height:1.4;">
+                                    Kendaraan <strong>{{ $merk }}</strong> diprediksi akan disewa sekitar
+                                    <strong>{{ round($row['prediksi']) }} kali</strong> pada bulan {{ $row['bulan_tahun'] }}.
+                                </small>
                             </div>
                             @endif
                         @endforeach
+                    </div>
+                    <div class="mt-2 pt-2" style="border-top:1px solid rgba(255,255,255,0.2);font-size:0.7rem;opacity:0.8;">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        Nilai prediksi berdasarkan pola data historis menggunakan metode Triple Exponential Smoothing (TES).
+                        Gunakan sebagai acuan persiapan armada.
                     </div>
                 </div>
             </div>
@@ -214,13 +228,63 @@
             <span class="badge badge-light border">{{ count($resultTable) }} baris</span>
         </div>
         <div class="card-body p-3">
+
+            {{-- REVISI: kotak keterangan kolom tanpa icon tanda tanya --}}
+            <div class="mb-3 p-3" style="background:#f8f9fc;border-radius:10px;border:1px solid #e9ecef;">
+                <p class="font-weight-bold mb-2" style="font-size:0.8rem;color:#444;">
+                    <i class="fas fa-info-circle text-primary mr-1"></i> Keterangan Kolom Tabel
+                </p>
+                <div class="row" style="font-size:0.78rem;color:#555;">
+                    <div class="col-md-4 mb-1">
+                        <strong>Aktual</strong> — Jumlah sewa nyata yang terjadi pada bulan tersebut.
+                    </div>
+                    <div class="col-md-4 mb-1">
+                        <strong>Level</strong> — Nilai rata-rata permintaan sewa yang sudah diperhalus (tanpa tren & musiman).
+                    </div>
+                    <div class="col-md-4 mb-1">
+                        <strong>Trend</strong> — Kecenderungan naik/turun permintaan dari bulan ke bulan.
+                    </div>
+                    <div class="col-md-4 mb-1">
+                        <strong>Seasonal</strong> — Pola musiman berulang tiap tahun (misal: ramai saat liburan/lebaran).
+                    </div>
+                    <div class="col-md-4 mb-1">
+                        <strong>Prediksi</strong> — Perkiraan jumlah sewa hasil perhitungan TES (Level + Trend + Seasonal).
+                    </div>
+                    <div class="col-md-4 mb-1">
+                        <strong>Error</strong> — Selisih aktual vs prediksi. Semakin kecil = semakin akurat.
+                    </div>
+                    <div class="col-md-12 mb-0 mt-1">
+                        <strong>APE%</strong> — Persentase kesalahan prediksi per bulan:
+                        <span class="badge badge-success ml-1">Sangat Baik &lt;10%</span>
+                        <span class="badge badge-primary ml-1">Baik 10–20%</span>
+                        <span class="badge badge-warning ml-1">Cukup 20–50%</span>
+                        <span class="badge badge-danger ml-1">Kurang &gt;50%</span>
+                    </div>
+                </div>
+            </div>
+            {{-- AKHIR REVISI kotak keterangan --}}
+
+            {{-- Legenda warna tabel --}}
+            <div class="d-flex align-items-center mb-2" style="gap:16px;font-size:0.78rem;color:#6c757d;">
+                <span><span style="display:inline-block;width:12px;height:12px;background:#343a40;border-radius:2px;margin-right:4px;"></span>Data historis aktual</span>
+                <span><span style="display:inline-block;width:12px;height:12px;background:#d4edda;border:1px solid #28a745;border-radius:2px;margin-right:4px;"></span>Hasil prediksi ke depan</span>
+            </div>
+
             <div class="table-responsive" style="max-height:340px;overflow-y:auto;">
                 <table class="table table-bordered table-sm table-hover mb-0" style="font-size:0.77rem;">
                     <thead class="thead-dark" style="position:sticky;top:0;">
                         <tr>
-                            <th>No</th><th>Bulan/Tahun</th><th>Aktual</th>
-                            <th>Level</th><th>Trend</th><th>Seasonal</th>
-                            <th>Prediksi</th><th>Error</th><th>APE%</th>
+                            {{-- REVISI: header tabel bersih tanpa icon --}}
+                            <th>No</th>
+                            <th>Bulan/Tahun</th>
+                            <th>Aktual</th>
+                            <th>Level</th>
+                            <th>Trend</th>
+                            <th>Seasonal</th>
+                            <th>Prediksi</th>
+                            <th>Error</th>
+                            <th>APE%</th>
+                            {{-- AKHIR REVISI --}}
                         </tr>
                     </thead>
                     <tbody>
@@ -240,6 +304,9 @@
                     </tbody>
                 </table>
             </div>
+
+        
+
         </div>
     </div>
 
@@ -247,8 +314,8 @@
     <div class="card border-0 shadow-sm mb-4" style="border-radius:12px;">
         <div class="card-body py-3 px-4 d-flex justify-content-between align-items-center">
             <small class="text-muted">
-                <i class="fas fa-check-circle text-success mr-1"></i>
-                Peramalan selesai. Simpan hasil untuk melihat di riwayat & perbandingan.
+
+
             </small>
             <div class="d-flex">
                 <form action="{{ route('peramalan_tes.store') }}" method="POST" class="mr-2">
